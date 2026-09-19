@@ -12,6 +12,7 @@ from tests.conftest import free_port
 
 def client(url, **kw):
     kw.setdefault("timeout", 5)
+    kw.setdefault("retry_backoff", (0, 0))     # never really sleep in tests
     return AIClient(url, **kw)
 
 

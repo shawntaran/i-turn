@@ -86,7 +86,8 @@ def test_ai_server_down_gives_a_readable_error_not_a_traceback(api):
 ])
 def test_each_failure_mode_reaches_the_student_as_a_sentence(mock_ai, mode, code, fragment):
     mock_ai.delay = 1.5
-    llm.set_client(AIClient(mock_ai.url, timeout=0.4 if mode == "slow" else 5))
+    llm.set_client(AIClient(mock_ai.url, timeout=0.4 if mode == "slow" else 5,
+                            retry_backoff=(0, 0)))
     api = TestClient(main.app)
     sid = begin(api)
     mock_ai.mode = mode

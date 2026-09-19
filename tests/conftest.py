@@ -50,6 +50,7 @@ class MockAI:
 
     def __init__(self) -> None:
         self.mode = "ok"
+        self.script: list[str] = []      # per-request modes, consumed in order
         self.reply = "That sounds heavy. What's been the hardest part?"
         self.json_reply = "{}"
         self.delay = 2.0
@@ -73,7 +74,7 @@ class MockAI:
                 body = json.loads(self.rfile.read(length) or b"{}")
                 mock.requests.append({"method": self.command, "path": self.path,
                                       "auth": self.headers.get("Authorization"), "json": body})
-                m = mock.mode
+                m = mock.script.pop(0) if mock.script else mock.mode
                 if m == "slow":
                     time.sleep(mock.delay)
                 if m == "interrupt":
@@ -99,6 +100,15 @@ class MockAI:
                     return self._send(503, {"error": {"code": "out_of_memory", "message": "oom"}})
                 if m == "tunnel_down":
                     return self._send(530, "<html>error code: 1033</html>", raw=True)
+                if m == "gateway_timeout":     # Cloudflare's own 100s limit
+                    return self._send(524, "<html>error code: 524</html>", raw=True)
+                if m == "bad_gateway":
+                    return self._send(502, "<html>Bad gateway</html>", raw=True)
+                if m == "rate_limited":
+                    return self._send(429, {"detail": "slow down"})
+                if m == "echo":
+                    last = (body.get("messages") or [{"content": body.get("prompt", "")}])[-1]["content"]
+                    return self._send(200, {"text": last, "model": "mock-model"})
                 if m == "not_found":
                     return self._send(404, "Not Found", raw=True)
                 if m == "crash":
