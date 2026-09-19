@@ -4,8 +4,10 @@ iturn.db
 iturn.db-shm
 iturn.db-wal
 
-# Local configuration and secrets
+# Local configuration and secrets (.env.local / .env.colab hold saved AI endpoints and keys)
 .env
+.env.*
+!.env.example
 
 # Model files never belong in this repository. Models live in the AI server's
 # runtime (e.g. Colab), not here.
