@@ -1,0 +1,12 @@
+# Dependencies of the AI server ONLY. The laptop running the i-turn app does not
+# need any of this except fastapi/uvicorn/httpx (already in ../requirements.txt).
+# In Colab, torch and CUDA are preinstalled; do not reinstall them.
+fastapi>=0.115
+uvicorn[standard]>=0.32
+httpx>=0.27
+pydantic>=2.9
+
+# Only for AI_ENGINE=transformers
+transformers>=4.44
+accelerate>=1.0
+bitsandbytes>=0.45        # only used when LOAD_IN_4BIT=1
