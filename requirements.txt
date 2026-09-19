@@ -1,0 +1,12 @@
+# Server
+fastapi>=0.115
+uvicorn[standard]>=0.32
+httpx>=0.27
+pydantic>=2.9
+
+# Only needed for ITURN_BACKEND=transformers (Colab path).
+# On the RTX 5050 (Blackwell, sm_120) you need CUDA 12.8+ wheels:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu128
+# transformers>=4.46
+# accelerate>=1.0
+# bitsandbytes>=0.45

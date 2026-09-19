@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I-Turn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#EDEAE3; --surface:#F7F5F0; --ink:#22271F; --muted:#6E756B;
+  --accent:#4E6A50; --accent-soft:#DDE4DA; --line:#D6D2C8; --warn:#8A5A2B;
+  --serif:'Newsreader',Georgia,serif;
+  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+:root:not([data-theme=light]){ }
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --ground:#161A15; --surface:#1D221C; --ink:#E4E2D9; --muted:#8E958A;
+    --accent:#9BB59B; --accent-soft:#283028; --line:#2F362E; --warn:#C89860;
+  }
+}
+:root[data-theme=dark]{
+  --ground:#161A15; --surface:#1D221C; --ink:#E4E2D9; --muted:#8E958A;
+  --accent:#9BB59B; --accent-soft:#283028; --line:#2F362E; --warn:#C89860;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; background:var(--ground); color:var(--ink);
+  font-family:var(--serif); font-size:18px; line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:38rem;margin:0 auto;padding:2rem 1.25rem 8rem;min-height:100vh}
+
+/* --- gate --- */
+.gate{padding-top:14vh}
+.gate h1{
+  font-weight:300; font-size:2.6rem; line-height:1.15; margin:0 0 .5rem;
+  letter-spacing:-.02em;
+}
+.gate p{color:var(--muted);margin:0 0 2rem;max-width:30rem}
+.field{margin-bottom:1.1rem}
+.field label{display:block;font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
+input[type=text],select{
+  width:100%;padding:.7rem .85rem;font:inherit;font-size:1rem;
+  background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:3px;
+}
+input:focus-visible,select:focus-visible,button:focus-visible{
+  outline:2px solid var(--accent);outline-offset:2px;
+}
+.modes{display:grid;gap:.6rem}
+.mode{
+  display:block;padding:.85rem 1rem;border:1px solid var(--line);
+  border-radius:3px;background:var(--surface);cursor:pointer;
+}
+.mode[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
+.mode b{display:block;font-weight:500}
+.mode span{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+.notice{
+  font-family:var(--sans);font-size:.82rem;color:var(--muted);
+  border-left:2px solid var(--line);padding:.2rem 0 .2rem .9rem;margin:1.6rem 0;
+}
+.notice strong{color:var(--ink);font-weight:600}
+button.go{
+  font:inherit;font-size:1rem;padding:.7rem 1.6rem;cursor:pointer;
+  background:var(--accent);color:var(--ground);border:none;border-radius:3px;
+}
+
+/* --- conversation --- */
+.turn{margin:0 0 1.6rem;max-width:32rem}
+.turn.me{margin-left:auto;text-align:right}
+.turn.me .body{
+  display:inline-block;text-align:left;background:var(--accent-soft);
+  padding:.55rem .9rem;border-radius:3px;
+}
+.turn.them .body{white-space:pre-wrap}
+.turn.sys .body{
+  font-family:var(--sans);font-size:.88rem;border-left:2px solid var(--warn);
+  padding:.6rem 0 .6rem .9rem;white-space:pre-wrap;
+}
+.turn.sys .body strong{color:var(--warn)}
+
+/* --- instrument interlude --- */
+.item{
+  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
+  padding:1.1rem 0;margin:1.6rem 0;
+}
+.item .frame{font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
+.item .stmt{font-size:1.15rem;font-weight:400;margin:0 0 .9rem}
+.anchors{display:grid;gap:.35rem}
+.anchor{
+  font:inherit;font-size:.92rem;text-align:left;cursor:pointer;
+  padding:.5rem .75rem;background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:3px;
+}
+.anchor:hover{border-color:var(--accent)}
+.anchor b{font-weight:500;margin-right:.5rem;color:var(--accent)}
+.progress{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:.8rem}
+
+/* --- offer --- */
+.offer{margin:1.4rem 0}
+.offer .actions{display:flex;gap:.6rem;margin-top:.7rem}
+.offer button{
+  font:inherit;font-size:.92rem;padding:.45rem 1.1rem;cursor:pointer;
+  border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:3px;
+}
+.offer button.yes{background:var(--accent);color:var(--ground);border-color:var(--accent)}
+
+/* --- results --- */
+.bands{margin:1.4rem 0;border-top:1px solid var(--line)}
+.band{display:flex;justify-content:space-between;align-items:baseline;
+  padding:.6rem 0;border-bottom:1px solid var(--line)}
+.band .n{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
+.band .v{font-size:1.05rem}
+
+/* --- composer --- */
+.composer{
+  position:fixed;left:0;right:0;bottom:0;background:var(--ground);
+  border-top:1px solid var(--line);padding:.9rem 1.25rem;
+}
+.composer .inner{max-width:38rem;margin:0 auto;display:flex;gap:.6rem;align-items:flex-end}
+textarea{
+  flex:1;font:inherit;font-size:1rem;resize:none;min-height:2.6rem;max-height:9rem;
+  padding:.55rem .8rem;background:var(--surface);color:var(--ink);
+  border:1px solid var(--line);border-radius:3px;
+}
+textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.composer button{
+  font:inherit;font-size:.95rem;padding:.55rem 1.1rem;cursor:pointer;
+  background:var(--accent);color:var(--ground);border:none;border-radius:3px;
+}
+.composer button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.composer button.ghost:hover{color:var(--ink);border-color:var(--accent)}
+.close{border-top:1px solid var(--line);margin-top:2rem;padding-top:1.4rem}
+.close h2{font-weight:300;font-size:1.5rem;margin:0 0 .3rem;letter-spacing:-.01em}
+.close .meta{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.2rem}
+.close .said{border-left:2px solid var(--line);padding-left:.9rem;margin:.6rem 0}
+.close .said .what{font-family:var(--sans);font-size:.75rem;color:var(--muted)}
+.close .note{color:var(--muted);font-size:.95rem;margin:.8rem 0 0}
+.close ul{padding-left:1.1rem;margin:.8rem 0 0}
+.close li{margin-bottom:.4rem}
+.hidden{display:none}
+.thinking{color:var(--muted);font-style:italic}
+@media (prefers-reduced-motion:no-preference){
+  .turn{animation:rise .25s ease-out}
+  @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <section id="gate" class="gate">
+    <h1>Tell me what's happening.</h1>
+    <p>No account, no real name. Start wherever you want — there's no right way in.</p>
+
+    <div class="field">
+      <label for="pseudonym">Pick a name to go by</label>
+      <input type="text" id="pseudonym" value="U_83F91A" autocomplete="off">
+    </div>
+
+    <div class="field">
+      <label for="language">Language</label>
+      <select id="language"></select>
+    </div>
+
+    <div class="field">
+      <label>How should this be remembered?</label>
+      <div class="modes">
+        <button type="button" class="mode" data-mode="incognito" aria-pressed="true">
+          <b>Incognito</b><span>Nothing is kept. Close the tab and it's gone.</span>
+        </button>
+        <button type="button" class="mode" data-mode="story" aria-pressed="false">
+          <b>Story</b><span>Remembers you between visits. Delete it whenever.</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="notice" id="notice"></div>
+    <button class="go" id="begin">Start talking</button>
+  </section>
+
+  <section id="convo" class="hidden"></section>
+</div>
+
+<div class="composer hidden" id="composer">
+  <div class="inner">
+    <textarea id="input" rows="1" placeholder="Whatever's on your mind."></textarea>
+    <button id="send">Send</button>
+    <button id="end" class="ghost" title="Finish and see a summary">Done</button>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let SID = null, MODE = 'incognito';
+
+async function api(path, opts={}) {
+  const r = await fetch(path, {
+    headers: {'Content-Type':'application/json'},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
+  return r.json();
+}
+
+// ---- boot
+(async () => {
+  const meta = await api('/api/meta');
+  $('#language').innerHTML = meta.languages.map(l=>`<option>${l}</option>`).join('');
+  $('#notice').innerHTML = meta.privacy_notice
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\n\n/g,'<br><br>');
+})();
+
+document.querySelectorAll('.mode').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.mode').forEach(x => x.setAttribute('aria-pressed','false'));
+  b.setAttribute('aria-pressed','true');
+  MODE = b.dataset.mode;
+});
+
+$('#begin').onclick = async () => {
+  const res = await api('/api/start', {method:'POST', body:{
+    pseudonym: $('#pseudonym').value.trim() || 'anon',
+    mode: MODE,
+    language: $('#language').value,
+  }});
+  SID = res.session_id;
+  $('#gate').classList.add('hidden');
+  $('#convo').classList.remove('hidden');
+  $('#composer').classList.remove('hidden');
+  say('them', res.returning
+    ? "Good to see you again. Where did we leave things?"
+    : "I'm listening. Take your time.");
+  $('#input').focus();
+};
+
+// ---- rendering
+function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
+function push(node){ $('#convo').append(node); node.scrollIntoView({block:'end', behavior:'smooth'}); }
+
+function say(who, text){
+  const cls = who==='me'?'me':who==='sys'?'sys':'them';
+  push(el(`<div class="turn ${cls}"><div class="body"></div></div>`));
+  $('#convo').lastElementChild.querySelector('.body').innerHTML =
+    text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
+}
+
+function renderOffer(offer){
+  const n = el(`<div class="offer">
+    <div class="turn them"><div class="body">${offer.prompt}</div></div>
+    <div class="actions">
+      <button class="yes">${offer.actions[0]}</button>
+      <button class="no">${offer.actions[1]}</button>
+    </div></div>`);
+  n.querySelector('.yes').onclick = async () => {
+    n.querySelector('.actions').remove();
+    handle(await api('/api/instrument/accept',{method:'POST',body:{session_id:SID}}));
+  };
+  n.querySelector('.no').onclick = async () => {
+    n.querySelector('.actions').remove();
+    handle(await api('/api/instrument/decline',{method:'POST',body:{session_id:SID}}));
+  };
+  push(n);
+}
+
+function renderItem(item, suggested){
+  const n = el(`<div class="item">
+    <div class="frame">Over the past week — statement ${item.number} of 21</div>
+    <p class="stmt">${item.text}</p>
+    <div class="anchors"></div>
+    <div class="progress"></div>
+  </div>`);
+  const box = n.querySelector('.anchors');
+  Object.entries(item.anchors).forEach(([v,label]) => {
+    const b = el(`<button class="anchor"><b>${v}</b>${label}</button>`);
+    if (String(suggested)===v) b.style.borderColor='var(--accent)';
+    b.onclick = async () => {
+      n.querySelector('.anchors').remove();
+      n.querySelector('.progress').textContent = `You answered: ${v} — ${label}`;
+      handle(await api('/api/instrument/answer',{method:'POST',
+        body:{session_id:SID, item:item.number, value:Number(v)}}));
+    };
+    box.append(b);
+  });
+  push(n);
+}
+
+function renderResult(r){
+  const rows = Object.entries(r.bands).map(([k,v]) =>
+    `<div class="band"><span class="n">${k}</span><span class="v">${v}</span></div>`).join('');
+  push(el(`<div class="bands">${rows}</div>`));
+}
+
+// ---- the one dispatcher
+function handle(res){
+  if (res.message) say(res.session_halted ? 'sys' : 'them', res.message);
+  if (res.offer) renderOffer(res.offer);
+  if (res.result) renderResult(res.result);
+  if (res.item) renderItem(res.item, res.suggested);
+  if (res.items) res.items.slice(0,1).forEach(i => renderItem(i));
+  if (res.session_halted) { $('#composer').classList.add('hidden'); }
+}
+
+// ---- composer
+const ta = $('#input');
+ta.addEventListener('input', () => { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
+ta.addEventListener('keydown', e => {
+  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+});
+$('#send').onclick = send;
+$('#end').onclick = endSession;
+
+async function endSession(){
+  if (!SID) return;
+  const res = await api('/api/end', {method:'POST', body:{session_id:SID}});
+  renderClose(res.report, res.mode);
+  $('#composer').classList.add('hidden');
+  SID = null;
+}
+
+function renderClose(r, mode){
+  const said = (r.you_talked_about || []).map(x =>
+    `<div class="said"><div class="what">${x.about}</div>${x.you_said}</div>`).join('');
+  const bands = r.screening_bands
+    ? Object.entries(r.screening_bands).map(([k,v]) =>
+        `<div class="band"><span class="n">${k}</span><span class="v">${v}</span></div>`).join('')
+    : '';
+  const next = (r.next || []).map(n => `<li>${n}</li>`).join('');
+  push(el(`<div class="close">
+    <h2>That's where we'll leave it.</h2>
+    <div class="meta">${r.length || ''}${r.ephemeral ? ' · nothing was kept' : ''}</div>
+    ${said}
+    ${bands ? `<div class="bands">${bands}</div>` : ''}
+    <p class="note">${r.screening_note || ''}</p>
+    <ul>${next}</ul>
+  </div>`));
+}
+
+async function send(){
+  const text = ta.value.trim();
+  if (!text || !SID) return;
+  ta.value=''; ta.style.height='auto';
+  say('me', text);
+  const pending = el(`<div class="turn them"><div class="body thinking">…</div></div>`);
+  push(pending);
+  try {
+    const res = await api('/api/turn',{method:'POST',body:{session_id:SID, text}});
+    pending.remove();
+    handle(res);
+  } catch (err) {
+    pending.remove();
+    say('sys', `That didn't go through: ${err.message}`);
+  }
+}
+</script>
+</body>
+</html>
