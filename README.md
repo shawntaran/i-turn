@@ -1,8 +1,14 @@
 # I-Turn — Step 1 prototype
 
-An open-ended conversation with a local 3B model, with DASS-21 and the
-Lifestyle R3 instrument layered underneath it. No cloud API, no per-token cost,
-nothing leaves the machine.
+An open-ended conversation with a 3B model, with DASS-21 and the
+Lifestyle R3 instrument layered underneath it. No commercial AI API, no
+per-token cost.
+
+The model does **not** run inside the app. The app is an HTTP client; the model
+runs in a separate AI server at `AI_BASE_URL` — on your own GPU, or in a Google
+Colab notebook so a laptop with no GPU can run everything else. See
+[COLLABORATION.md](COLLABORATION.md). "Nothing leaves the machine" holds only
+when that server is local.
 
 Supersedes `Privacy_Aware_AI_Student_Wellbeing_System.ipynb` — keeps its
 Story/Incognito modes, SQLite persistence, language switching and
@@ -31,10 +37,11 @@ defensible here — not the model's quality.
 ## Layout
 
 ```
-app/
+app/                     the application — no model, no torch, no CUDA
   safety.py              risk detection — pre-model, deterministic, high recall
   session.py             orchestration; open conversation is the default state
-  llm.py                 ollama | transformers | stub backends
+  ai_client.py           HTTP client for the AI server; every failure -> AIError
+  llm.py                 reply() / extract() on top of ai_client
   db.py                  SQLite: consent, turns, responses, scores, risk events
   prompts.py             system prompts; no covert-assessment instruction
   main.py                FastAPI
@@ -42,7 +49,14 @@ app/
     dass21.py            verbatim items, scoring, bands
     lifestyle.py         slot schema for conversational extraction
 static/index.html        open-ended chat UI
-tests_smoke.py           scoring boundaries, safety cases, session flow
+ai_server/
+  server.py              the AI server: HTTP contract + engines (transformers | ollama | stub)
+collab/
+  i-turn-ai-server.ipynb Colab notebook that runs ai_server/server.py behind a tunnel
+  build_notebook.py      regenerates the notebook from ai_server/server.py
+tests/                   pytest; mock AI server, no GPU needed
+.env.example             AI_BASE_URL and friends
+COLLABORATION.md         how to run the app with no GPU
 ```
 
 ## Stack, and why
@@ -50,7 +64,7 @@ tests_smoke.py           scoring boundaries, safety cases, session flow
 | Layer | Choice | Reason |
 |---|---|---|
 | Model | Qwen2.5-3B-Instruct, Q4_K_M | Fits the 5050 with headroom. Strong Hindi/Kannada/Tamil for Phase 3 — that's the real reason over Llama-3.2-3B or Phi-3.5. |
-| Serving | Ollama (llama.cpp) | Blackwell support works out of the box. `transformers` backend kept for Colab and future LoRA. |
+| Serving | `ai_server/` over HTTP, engine `ollama` or `transformers` | The app only knows a URL. Ollama sidesteps Blackwell CUDA wheel problems locally; `transformers` is what runs in Colab and leaves room for LoRA. |
 | Backend | FastAPI | Same stack as your other projects; sync endpoints are fine at this scale. |
 | Storage | SQLite + WAL | Prototype only. Becomes Postgres the moment counsellors read dashboards while students are mid-session. |
 | Frontend | Plain HTML/JS | No build step. Swap for Next.js when the counsellor dashboard arrives. |
@@ -62,50 +76,69 @@ meaningful jump in conversational quality.
 
 ## Running it
 
-### RTX 5050 (local)
+Two processes: the **AI server** (holds the model) and the **app** (UI, backend,
+database). Only `AI_BASE_URL` says where the first one is.
+
+```bash
+pip install -r requirements.txt          # the app: no torch, no CUDA
+cp .env.example .env                     # then set AI_BASE_URL (and AI_API_KEY)
+uvicorn app.main:app --port 8000         # http://localhost:8000
+```
+
+### No GPU — model in Google Colab
+
+Open `collab/i-turn-ai-server.ipynb` in Colab, pick a GPU runtime, run all, and
+copy the `AI_BASE_URL` / `AI_API_KEY` it prints into `.env`. Full walkthrough in
+[COLLABORATION.md](COLLABORATION.md).
+
+### RTX 5050 (local) — model on this machine
 
 The 5050 is Blackwell, compute capability **sm_120**. Any PyTorch built before
 CUDA 12.8 will fail with `no kernel image is available for execution on the
-device`. Ollama sidesteps this entirely, which is the main reason it's the
-default.
+device`. Ollama sidesteps this entirely, so it is the easy local route:
 
 ```bash
-curl -fsSL https://ollama.com/install.sh | sh
 ollama pull qwen2.5:3b-instruct-q4_K_M
-
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-# http://localhost:8000
+AI_ENGINE=ollama MODEL_NAME=qwen2.5:3b-instruct-q4_K_M python -m ai_server.server
+# .env:  AI_BASE_URL=http://localhost:8001
 ```
 
-If you want the `transformers` path locally:
+Or load the weights directly (needs CUDA 12.8 wheels):
 ```bash
 pip install torch --index-url https://download.pytorch.org/whl/cu128
-pip install transformers accelerate bitsandbytes
-ITURN_BACKEND=transformers uvicorn app.main:app --port 8000
+pip install -r ai_server/requirements.txt
+AI_ENGINE=transformers MODEL_NAME=Qwen/Qwen2.5-3B-Instruct python -m ai_server.server
 ```
 
-### Colab
-
-See `notebooks/iturn_colab.ipynb`. T4 handles 3B in 4-bit comfortably.
-
-### No GPU
+### No model at all
 
 ```bash
-ITURN_BACKEND=stub uvicorn app.main:app --port 8000
-python tests_smoke.py
+AI_ENGINE=stub python -m ai_server.server
 ```
 Canned model text, everything else real. Good enough to build the UI and the
 counsellor dashboard against.
 
+### Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest
+```
+No GPU, model, Colab or credentials needed.
+
 ## Environment
+
+The app (`.env`, see `.env.example`):
 
 | Var | Default | |
 |---|---|---|
-| `ITURN_BACKEND` | `ollama` | `ollama` \| `transformers` \| `stub` |
-| `ITURN_MODEL` | `qwen2.5:3b-instruct-q4_K_M` | Ollama tag |
-| `ITURN_HF_MODEL` | `Qwen/Qwen2.5-3B-Instruct` | HF repo |
-| `OLLAMA_URL` | `http://localhost:11434` | |
+| `AI_BASE_URL` | `http://localhost:8001` | Where the AI server is. The only thing that changes between local and Colab. |
+| `AI_API_KEY` | *(empty)* | Bearer key, if the AI server requires one. The Colab notebook generates one. |
+| `AI_TIMEOUT` | `120` | Seconds to wait for one AI answer. |
+| `AI_MODEL` | *(empty)* | Optional, advisory model identifier sent with requests. |
+
+The AI server (environment, see the docstring in `ai_server/server.py`):
+`AI_ENGINE`, `MODEL_NAME`, `AI_API_KEY`, `HOST`, `PORT`, `LOAD_IN_4BIT`, `OLLAMA_URL`.
 
 ---
 
