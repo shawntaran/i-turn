@@ -14,7 +14,17 @@ matter:
     asymmetry needs the ethics committee's explicit sign-off — write it into
     the protocol, don't leave it as an engineering decision.
 
-Incognito Mode touches none of this. Nothing is opened, nothing is written.
+What Incognito Mode stores: no conversation, no questionnaire answers, no
+scores, no lifestyle details, no record that the session happened. All of that
+lives in memory and is gone when the session ends. The one exception is the
+safeguarding record (log_risk): if the student says something that suggests they
+may be in danger, *that it happened* is written — never what they said — and the
+privacy notice tells them so before they begin.
+
+The rule is enforced here, at the write, not by callers remembering to check:
+every function that stores content requires the "store_conversation" consent
+that only Story Mode grants. (The database file is still opened in Incognito,
+because the safeguarding record needs it.)
 """
 
 from __future__ import annotations
@@ -130,9 +140,15 @@ def has_consent(conn, pseudonym: str, session_id: str, scope: str) -> bool:
     return cur.fetchone() is not None
 
 
+def _may_store(conn, pseudonym: str, session_id: str) -> bool:
+    """Content is stored only for a session whose student chose Story Mode.
+    Incognito, or consent not given, means: silently do nothing."""
+    return has_consent(conn, pseudonym, session_id, "store_conversation")
+
+
 def save_turn(conn, pseudonym: str, session_id: str, role: str, content: str) -> None:
-    if not has_consent(conn, pseudonym, session_id, "store_conversation"):
-        return  # incognito, or consent not given — silently do nothing
+    if not _may_store(conn, pseudonym, session_id):
+        return
     _write(conn, "INSERT INTO turns VALUES (?,?,?,?,?)",
            (pseudonym, session_id, _now(), role, content))
 
@@ -159,11 +175,15 @@ def prior_turns(conn, pseudonym: str, exclude_session: str, limit: int = 20) -> 
 
 
 def save_response(conn, pseudonym, session_id, instrument, item, response, confirmed=True) -> None:
+    if not _may_store(conn, pseudonym, session_id):
+        return
     _write(conn, "INSERT OR REPLACE INTO instrument_responses VALUES (?,?,?,?,?,?,?)",
            (pseudonym, session_id, instrument, item, response, int(confirmed), _now()))
 
 
 def save_score(conn, pseudonym, session_id, instrument, payload: dict) -> None:
+    if not _may_store(conn, pseudonym, session_id):
+        return
     _write(conn, "INSERT INTO instrument_scores VALUES (?,?,?,?,?)",
            (pseudonym, session_id, instrument, _now(), json.dumps(payload)))
 
@@ -177,6 +197,8 @@ def score_history(conn, pseudonym: str, instrument: str = "dass21") -> list[dict
 
 
 def save_lifestyle(conn, pseudonym, session_id, slot, value, quote="") -> None:
+    if not _may_store(conn, pseudonym, session_id):
+        return
     _write(conn, "INSERT OR REPLACE INTO lifestyle VALUES (?,?,?,?,?,?)",
            (pseudonym, session_id, slot, json.dumps(value), quote, _now()))
 
