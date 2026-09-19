@@ -5,11 +5,22 @@
   server (no CDN, no web fonts, no icon font). Tokens come from the Stitch design
   system; the dark palette is ours (Stitch only defined light).
 
-  Fonts: the design calls for Newsreader (serif) and Work Sans (sans). They are
-  not bundled yet, so the stacks fall back to Georgia / the system UI font. To use
-  the real ones, add the .woff2 files described in static/fonts/README.md — no
-  other change is needed.
+  Fonts: Newsreader (serif) and Work Sans (sans), self-hosted from /static/fonts
+  (SIL OFL; see the README there). If a file ever fails to load, the stacks fall
+  back to Georgia / the system UI font, so the page still reads correctly.
 */
+
+/* ------------------------------------------------------------------ fonts */
+@font-face {
+  font-family: "Newsreader";
+  src: url("/static/fonts/Newsreader-Variable.woff2") format("woff2");
+  font-weight: 400 600; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "Work Sans";
+  src: url("/static/fonts/WorkSans-Variable.woff2") format("woff2");
+  font-weight: 400 600; font-style: normal; font-display: swap;
+}
 
 /* ---------------------------------------------------------------- tokens */
 :root {
@@ -179,7 +190,7 @@ legend { padding: 0; }
 .field--row .label { font-weight: 400; color: var(--on-variant); }
 .lang { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
 .lang__now { font: 500 .875rem/1.25rem var(--sans); background: var(--surface-container); padding: .25rem .625rem; border-radius: var(--r); }
-.lang__next { font-size: .9375rem; font-style: italic; color: var(--on-variant); }
+.lang__next { font-size: .9375rem; color: var(--on-variant); }
 
 .input-wrap { position: relative; margin-top: .5rem; }
 .input {
@@ -224,7 +235,7 @@ legend { padding: 0; }
 .notice__exception { border-left: 2px solid var(--secondary); padding-left: 1rem; }
 
 .form-error { padding: .75rem 1rem; border-left: 3px solid var(--secondary); background: var(--secondary-soft); color: var(--on-secondary-soft); font: 500 .9375rem/1.5rem var(--sans); }
-.ai-note { margin-top: -.5rem; text-align: center; font-size: .9375rem; font-style: italic; color: var(--on-variant); }
+.ai-note { margin-top: -.5rem; text-align: center; font-size: .9375rem; color: var(--on-variant); }
 
 /* -------------------------------------------------------------- buttons */
 .btn {

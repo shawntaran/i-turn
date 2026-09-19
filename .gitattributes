@@ -1,0 +1,4 @@
+# Font and image files are binary: never convert line endings.
+*.woff2 binary
+*.woff binary
+*.ttf binary

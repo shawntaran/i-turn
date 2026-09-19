@@ -239,3 +239,42 @@ def test_no_red_anywhere():
         hue, light, sat = colorsys.rgb_to_hls(r, g, b)[0] * 360, colorsys.rgb_to_hls(r, g, b)[1], colorsys.rgb_to_hls(r, g, b)[2]
         if sat > 0.3 and 0.15 < light < 0.9:
             assert not (hue < 16 or hue > 340), f"{h} is red (hue {hue:.0f})"
+
+
+# -- fonts ----------------------------------------------------------------------------------------
+
+FONT_URLS = re.findall(r'url\("(/static/fonts/[^"]+)"\)', CSS)
+
+
+def test_fonts_are_bundled_valid_and_served_from_this_server():
+    assert len(FONT_URLS) == 2
+    c = TestClient(main.app)
+    for url in FONT_URLS:
+        path = STATIC.parent / url.lstrip("/")
+        data = path.read_bytes()
+        assert data[:4] == b"wOF2", f"{path.name} is not a WOFF2 file"
+        r = c.get(url)
+        assert r.status_code == 200 and r.content == data
+
+
+def test_fonts_stay_small_enough_for_a_phone():
+    total = sum((STATIC.parent / u.lstrip("/")).stat().st_size for u in FONT_URLS)
+    assert total < 200_000, f"{total} bytes of fonts"
+
+
+def test_font_licences_travel_with_the_fonts():
+    for name in ("OFL-Newsreader.txt", "OFL-WorkSans.txt"):
+        text = (STATIC / "fonts" / name).read_text(encoding="utf-8")
+        assert "SIL OPEN FONT LICENSE" in text and "Copyright" in text
+
+
+def test_font_loading_never_blocks_text_and_is_preloaded():
+    assert CSS.count("font-display: swap") == len(FONT_URLS)
+    for url in FONT_URLS:
+        assert f'href="{url}"' in HTML and "crossorigin" in HTML      # same-origin fonts still need it
+
+
+def test_no_italics_because_no_italic_font_is_bundled():
+    """A missing italic face makes the browser slant the regular one, which looks wrong
+    (and italics are harder to read for many dyslexic readers)."""
+    assert "italic" not in CSS.replace("Newsreader-Italic", "")

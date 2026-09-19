@@ -1,51 +1,63 @@
 # Fonts
 
-The design (from Stitch) uses two typefaces:
+The design (from Stitch) uses two typefaces, both bundled here and served by this
+server — nothing is fetched from Google or anywhere else.
 
-| Role | Font | Used for |
-|---|---|---|
-| Serif | **Newsreader** | headlines, the conversation, questionnaire statements |
-| Sans | **Work Sans** | small interface labels, buttons, meta text |
+| Role | Font | File | Size |
+|---|---|---|---|
+| Serif | **Newsreader** | `Newsreader-Variable.woff2` | 96 KB |
+| Sans | **Work Sans** | `WorkSans-Variable.woff2` | 54 KB |
 
-They are **not bundled yet**, so the app currently falls back to Georgia and the
-system UI font (see `--serif` / `--sans` in `../css/app.css`). Nothing is broken —
-it just looks slightly less refined than the design.
+Both are open-source under the **SIL Open Font License 1.1**. The licence texts are
+kept next to the fonts (`OFL-Newsreader.txt`, `OFL-WorkSans.txt`) and must stay with
+them if the files are copied or redistributed.
 
-## Why they are not loaded from Google Fonts
+## Why self-hosted
 
-The original design pulled them from Google Fonts. That sends every student's
-browser to Google on each page load, which contradicts I-Turn's privacy story
-("nothing leaves the machine"). Fonts must be served from this server instead.
+The original design loaded them from Google Fonts, which would send every student's
+browser to Google on each visit — at odds with I-Turn's privacy promise. A test
+(`tests/test_ui_assets.py`) fails if the page ever references an outside host.
 
-## To use the real fonts
+## What these files are
 
-Both are open-source (SIL Open Font License 1.1), so they can be committed to this
-repository. Add these files here and keep each font's `OFL.txt` licence next to it:
+They are **variable fonts**, trimmed to what the UI uses, so a few small files cover
+every weight:
 
+- **Latin subset** (Basic Latin, Latin-1, general punctuation: curly quotes, dashes,
+  bullets, ellipsis) — the standard Google Fonts "latin" range.
+- **Weights 400–600 only** (regular, medium, semibold — the only ones the CSS uses).
+  Newsreader keeps its optical-size axis, so headlines and body text are drawn
+  differently at different sizes, as the designers intended.
+- **No italic file.** Italic text is not used anywhere (it is harder to read for many
+  dyslexic readers), and the CSS has a test against `font-style: italic` so the
+  browser never fakes one.
+
+Roughly 150 KB in total, cached after the first visit. `font-display: swap` shows text
+immediately in Georgia / the system font and swaps when the file arrives; if a font
+fails to load, the page still reads correctly.
+
+## Regenerating or updating
+
+Source: <https://github.com/google/fonts> → `ofl/newsreader/` and `ofl/worksans/`
+(`Newsreader[opsz,wght].ttf`, `WorkSans[wght].ttf`, and each folder's `OFL.txt`).
+
+```bash
+pip install fonttools brotli
+
+# 1. keep only the weights the UI uses
+python -m fontTools.varLib.instancer "Newsreader[opsz,wght].ttf" wght=400:600 -o Newsreader-trim.ttf
+python -m fontTools.varLib.instancer "WorkSans[wght].ttf"        wght=400:600 -o WorkSans-trim.ttf
+
+# 2. Latin subset, compressed to WOFF2
+U="U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD"
+pyftsubset Newsreader-trim.ttf --unicodes="$U" --layout-features='*' --flavor=woff2 --output-file=Newsreader-Variable.woff2
+pyftsubset WorkSans-trim.ttf   --unicodes="$U" --layout-features='*' --flavor=woff2 --output-file=WorkSans-Variable.woff2
 ```
-static/fonts/Newsreader-Variable.woff2
-static/fonts/Newsreader-Italic-Variable.woff2
-static/fonts/WorkSans-Variable.woff2
-```
-
-Then add to the top of `../css/app.css`:
-
-```css
-@font-face { font-family: "Newsreader"; src: url("/static/fonts/Newsreader-Variable.woff2") format("woff2");
-             font-weight: 200 800; font-style: normal; font-display: swap; }
-@font-face { font-family: "Newsreader"; src: url("/static/fonts/Newsreader-Italic-Variable.woff2") format("woff2");
-             font-weight: 200 800; font-style: italic; font-display: swap; }
-@font-face { font-family: "Work Sans"; src: url("/static/fonts/WorkSans-Variable.woff2") format("woff2");
-             font-weight: 100 900; font-style: normal; font-display: swap; }
-```
-
-`font-display: swap` shows text immediately in the fallback and swaps when the font
-arrives. Subsetting to Latin keeps each file small (the page budget is ~100 KB of
-CSS + JS, excluding fonts).
 
 ## Indian-language scripts
 
 The pilot is English-only, but the UI is built to take Hindi, Kannada, Tamil, Telugu,
-Malayalam, Marathi and Bengali later. When those ship, add Noto Serif / Noto Sans
-for each script the same way (Noto is also OFL). The stylesheet already raises
-line-height for those `lang` values.
+Malayalam, Marathi and Bengali later. When those ship, add **Noto Serif / Noto Sans**
+for each script the same way (Noto is also OFL) and a matching `@font-face` with a
+`unicode-range`, so a student only downloads the script they use. The stylesheet
+already raises line-height for those `lang` values.
