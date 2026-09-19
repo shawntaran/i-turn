@@ -49,6 +49,7 @@ app/                     the application — no model, no torch, no CUDA
     dass21.py            verbatim items, scoring, bands
     lifestyle.py         slot schema for conversational extraction
 static/index.html        open-ended chat UI
+switch_ai.py             flip .env between your local AI server and Colab
 ai_server/
   server.py              the AI server: HTTP contract + engines (transformers | ollama | stub)
 collab/
@@ -109,6 +110,14 @@ pip install torch --index-url https://download.pytorch.org/whl/cu128
 pip install -r ai_server/requirements.txt
 AI_ENGINE=transformers MODEL_NAME=Qwen/Qwen2.5-3B-Instruct python -m ai_server.server
 ```
+
+### Switching between them
+
+```bash
+python switch_ai.py status | local | colab [--new]
+```
+Remembers each target's address and key and rewrites only the two AI lines of
+`.env`. See [COLLABORATION.md](COLLABORATION.md#switching-between-your-own-model-and-colab).
 
 ### No model at all
 

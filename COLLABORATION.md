@@ -189,6 +189,43 @@ curl http://localhost:8000/api/ai/health
 A failed message is not lost or half-saved: the app rolls the turn back, so you
 can just send it again.
 
+## Switching between your own model and Colab
+
+You shouldn't have to hand-edit `.env` every time. `switch_ai.py` remembers one
+address per target and flips between them:
+
+```bash
+python switch_ai.py status               # what am I using, and is it up?
+python switch_ai.py local                # your own machine (http://localhost:8001)
+python switch_ai.py colab                # the Colab address you used last time
+python switch_ai.py colab --new          # paste the banner from a fresh Colab run
+```
+
+`colab --new` waits for you to paste the `AI_BASE_URL=…` and `AI_API_KEY=…` lines
+from the notebook (or the whole banner — it finds them) and carries on the moment
+it has both. It rewrites only those two lines of `.env`, checks the server is
+reachable, and tells you if it isn't. Your key is never printed. The saved
+addresses live in `.env.local` and `.env.colab`, which are git-ignored.
+
+The app reads `.env` when it starts. Run it like this and it restarts by itself
+whenever `switch_ai.py` changes the file:
+
+```bash
+python -m uvicorn app.main:app --port 8080 --reload --reload-include .env
+```
+
+(Restarting drops any in-progress chat, since sessions live in memory — fine for
+development. Without `--reload`, press Ctrl+C and start it again.)
+
+A typical day:
+
+| You want to… | Do this |
+|---|---|
+| Use Colab (first time today) | Run the notebook, then `python switch_ai.py colab --new` and paste |
+| Go back to your local model | Start it (`python -m ai_server.server`, see below), then `python switch_ai.py local` |
+| Colab timed out / new tunnel URL | Re-run the notebook, then `python switch_ai.py colab --new` |
+| Check which one is live | `python switch_ai.py status` |
+
 ## Other ways to run the AI server
 
 The AI server is one file, [`ai_server/server.py`](ai_server/server.py). Colab is
@@ -233,6 +270,22 @@ Send `messages` **or** `prompt`, not both. Response:
 `GET /health` → `{"status": "ok" | "loading" | "error", "model": "..."}` (HTTP 200
 only when `ok`). If a key is configured, send `Authorization: Bearer <key>`.
 Errors are `{"error": {"code": "...", "message": "..."}}`.
+
+## How the connection copes with a flaky tunnel
+
+Free tunnels blip. The app handles the common cases so you don't see them:
+
+- **Brief drops are retried.** A connection reset, or Cloudflare answering
+  502/520–523/525–530 while the tunnel reconnects, is retried twice (after 1 s and
+  3 s) before an error reaches the chat.
+- **Things that can't get better are not retried:** a wrong key, a wrong address,
+  a model that's still loading or out of memory, a request that already timed out.
+- **Typos in `AI_BASE_URL` are forgiven:** quotes, spaces, a trailing `/`, or a
+  pasted `/health` or `/v1/generate` are stripped, and `http://` on a
+  `trycloudflare.com` address is upgraded to `https://` so the key is never sent
+  in the clear.
+- **Cloudflare's 100-second limit** (error 524) is reported as "took too long",
+  not "unavailable".
 
 ## Running the tests (no GPU needed)
 
