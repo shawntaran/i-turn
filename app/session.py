@@ -154,6 +154,19 @@ class Session:
         self.phase = Phase.OPEN
         return {"phase": "open", "message": "No problem. What were you saying?"}
 
+    def stop_instrument(self) -> dict:
+        """The student stops part-way. The offer promised "you can stop at any
+        point", and this is what makes that true. Answers already given stay as
+        they are (an incomplete set is never scored into bands, for the student
+        or as a referral), the conversation resumes, and the questionnaire is not
+        offered again this session."""
+        self.pending_item = None
+        self.dass_declined = True
+        if self.phase in (Phase.INSTRUMENT, Phase.OFFERING):
+            self.phase = Phase.OPEN
+        return {"phase": self.phase.value,
+                "message": "That's completely fine. It's here whenever you want it."}
+
     def answer_item(self, item: int, value: int) -> dict:
         """Explicit button press. This is the only path that produces a
         confirmed DASS response."""

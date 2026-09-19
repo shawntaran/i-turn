@@ -202,6 +202,11 @@ def decline(req: ChoiceRequest) -> dict:
     return _get(req.session_id).decline_instrument()
 
 
+@app.post("/api/instrument/stop")
+def stop(req: ChoiceRequest) -> dict:
+    return _get(req.session_id).stop_instrument()
+
+
 @app.post("/api/instrument/answer")
 def answer(req: AnswerRequest) -> dict:
     try:
