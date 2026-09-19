@@ -4,21 +4,22 @@ I-Turn prototype server.
 Deliberately thin. All the judgement lives in session.py, safety.py and the
 instrument modules; this file just moves JSON around.
 
-Run:
-    ollama serve &
-    ollama pull qwen2.5:3b-instruct-q4_K_M
-    uvicorn app.main:app --reload --port 8000
+This process never loads a model. It talks to an AI server over HTTP at
+AI_BASE_URL (see .env.example, COLLABORATION.md and ai_server/server.py).
 
-No-GPU dev:
-    ITURN_BACKEND=stub uvicorn app.main:app --reload --port 8000
+Run:
+    cp .env.example .env        # then set AI_BASE_URL
+    uvicorn app.main:app --reload --port 8000
 """
 
 from __future__ import annotations
 
+import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -26,7 +27,37 @@ from . import db, llm, prompts, report, safety
 from .instruments import dass21
 from .session import Mode, Session
 
-app = FastAPI(title="I-Turn prototype")
+log = logging.getLogger("iturn")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    # Tell the developer at startup, not at the first student message, that the
+    # AI server isn't reachable. Never fatal: the server may be started after.
+    try:
+        h = llm.get_client().health()
+        if h["status"] == "ok":
+            log.info("AI server ready: model=%s", h.get("model"))
+        else:
+            log.warning("AI server reachable but %s (%s)", h["status"], h.get("detail", ""))
+    except llm.AIError as e:
+        log.warning("AI server not reachable: %s. Details: %s", e.message, e.detail)
+    yield
+
+
+app = FastAPI(title="I-Turn prototype", lifespan=lifespan)
+
+
+@app.exception_handler(llm.AIError)
+async def ai_error_handler(_: Request, exc: llm.AIError) -> JSONResponse:
+    """Any AI-server failure becomes a plain 503 with a sentence a student can
+    read. `detail` is the field the UI already shows; the code is for tooling.
+    The technical reason goes to the log, not to the client."""
+    log.warning("AI call failed [%s]: %s", exc.code, exc.detail)
+    return JSONResponse(
+        status_code=503,
+        content={"detail": exc.message, "error": {"code": exc.code}},
+    )
 
 SESSIONS: dict[str, Session] = {}   # in-memory; Phase 2 = Redis or signed cookies
 STATIC = Path(__file__).parent.parent / "static"
@@ -76,12 +107,26 @@ def _get(session_id: str) -> Session:
 @app.get("/api/meta")
 def meta() -> dict:
     return {
-        "model": llm.MODEL,
-        "backend": llm.BACKEND,
+        "model": llm.get_client().model or None,
+        "backend": "http",
         "languages": prompts.LANGUAGES,
         "privacy_notice": PRIVACY_NOTICE,
         "crisis_resources": safety.CRISIS_RESOURCES,
     }
+
+
+@app.get("/api/ai/health")
+def ai_health() -> JSONResponse:
+    """Is the AI server reachable, and is its model ready? 200 only when a
+    turn would actually work."""
+    try:
+        h = llm.get_client().health()
+    except llm.AIError as e:
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unreachable", "code": e.code, "message": e.message},
+        )
+    return JSONResponse(status_code=200 if h["status"] == "ok" else 503, content=h)
 
 
 @app.post("/api/start")
