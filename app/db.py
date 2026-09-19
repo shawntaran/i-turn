@@ -137,6 +137,15 @@ def save_turn(conn, pseudonym: str, session_id: str, role: str, content: str) ->
            (pseudonym, session_id, _now(), role, content))
 
 
+def drop_last_turn(conn, pseudonym: str, session_id: str, role: str) -> None:
+    """Undo the most recent save_turn for this role. Used when the model call
+    that the turn belonged to failed, so a retry doesn't store it twice."""
+    _write(conn,
+           "DELETE FROM turns WHERE rowid = (SELECT MAX(rowid) FROM turns "
+           "WHERE pseudonym=? AND session_id=? AND role=?)",
+           (pseudonym, session_id, role))
+
+
 def prior_turns(conn, pseudonym: str, exclude_session: str, limit: int = 20) -> list[tuple[str, str]]:
     """Longitudinal context from PREVIOUS sessions only — the current session's
     turns are already in the live history, which is what caused the earlier

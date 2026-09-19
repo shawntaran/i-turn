@@ -105,23 +105,33 @@ class Session:
         if self.phase is Phase.INSTRUMENT and self.pending_item is not None:
             return self._instrument_turn(text)
 
-        # 3. Open conversation. Harvest lifestyle slots quietly, in the
-        #    background, from what they volunteered.
-        self._harvest_lifestyle(text)
+        # 3. Open conversation. Everything that can call the model is inside
+        #    this block: if the AI server fails, the turn is undone so the
+        #    student can simply send it again.
+        try:
+            # Harvest lifestyle slots quietly, from what they volunteered.
+            self._harvest_lifestyle(text)
 
-        # 4. Decide whether this is a moment to offer the questionnaire.
-        phase_for_prompt = self.phase.value
-        if self._should_offer():
+            # Decide whether this is a moment to offer the questionnaire.
+            offering = self._should_offer()
+            phase_for_prompt = self.phase.value
+            if offering:
+                phase_for_prompt = "offer"
+            elif self.peak_risk >= safety.Risk.ELEVATED:
+                phase_for_prompt = "elevated"
+
+            msg = llm.reply(
+                prompts.system_prompt(self.language, phase_for_prompt),
+                self.history[-12:],
+            )
+        except llm.AIError:
+            self._undo_user_turn()
+            raise
+
+        # Only now is the offer real: the student is about to see it.
+        if offering:
             self.dass_offered = True
             self.phase = Phase.OFFERING
-            phase_for_prompt = "offer"
-        elif self.peak_risk >= safety.Risk.ELEVATED:
-            phase_for_prompt = "elevated"
-
-        msg = llm.reply(
-            prompts.system_prompt(self.language, phase_for_prompt),
-            self.history[-12:],
-        )
         self._record("assistant", msg)
 
         out: dict = {"phase": self.phase.value, "message": msg}
@@ -225,6 +235,12 @@ class Session:
                 db.save_lifestyle(self.conn, self.pseudonym, self.session_id, slot, value, text[:200])
             except ValueError:
                 pass
+
+    def _undo_user_turn(self) -> None:
+        if self.history and self.history[-1]["role"] == "user":
+            self.history.pop()
+            if self.mode is Mode.STORY:
+                db.drop_last_turn(self.conn, self.pseudonym, self.session_id, "user")
 
     def _record(self, role: str, content: str) -> None:
         self.history.append({"role": role, "content": content})

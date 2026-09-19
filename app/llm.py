@@ -1,12 +1,10 @@
 """
-Model backend.
+Language-model access for the application.
 
-Two interchangeable backends, same interface:
-  - "ollama"       : local llama.cpp server. Default. Easiest on the RTX 5050.
-  - "transformers" : HF, for Colab or if you want LoRA later.
-  - "stub"         : no model at all, deterministic canned text. Used by tests
-                     and by anyone who wants to work on the state machine or UI
-                     without a GPU.
+There is no model in this process. Every call goes through app/ai_client.py to
+an AI server at AI_BASE_URL, which may be running on this machine, in a Google
+Colab notebook, or anywhere else that speaks the same HTTP contract. Nothing
+here knows or cares which.
 
 The model is asked to do exactly two things, both narrow:
   reply()   — write one empathic conversational turn
@@ -21,18 +19,28 @@ way a 3B model is defensible in a mental-health setting.
 from __future__ import annotations
 
 import json
-import os
 import re
 from dataclasses import dataclass
-from typing import Any, Literal
 
-import httpx
+from .ai_client import AIClient, AIError, from_env
 
-Backend = Literal["ollama", "transformers", "stub"]
+__all__ = ["AIError", "GenConfig", "get_client", "set_client", "reply", "extract", "extract_likert"]
 
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
-MODEL = os.environ.get("ITURN_MODEL", "qwen2.5:3b-instruct-q4_K_M")
-BACKEND: Backend = os.environ.get("ITURN_BACKEND", "ollama")  # type: ignore[assignment]
+_client: AIClient | None = None
+
+
+def get_client() -> AIClient:
+    """The process-wide client, built from the environment on first use."""
+    global _client
+    if _client is None:
+        _client = from_env()
+    return _client
+
+
+def set_client(client: AIClient | None) -> None:
+    """Swap the client (tests, or a future settings screen). None resets it."""
+    global _client
+    _client = client
 
 
 @dataclass
@@ -43,85 +51,18 @@ class GenConfig:
     repeat_penalty: float = 1.1
 
 
-# ---------------------------------------------------------------------------
-# Ollama
-# ---------------------------------------------------------------------------
-
-def _ollama_chat(messages: list[dict], cfg: GenConfig, json_mode: bool = False) -> str:
-    payload: dict[str, Any] = {
-        "model": MODEL,
-        "messages": messages,
-        "stream": False,
-        "options": {
-            "temperature": 0.0 if json_mode else cfg.temperature,
-            "top_p": cfg.top_p,
-            "num_predict": 128 if json_mode else cfg.max_tokens,
-            "repeat_penalty": cfg.repeat_penalty,
-        },
-    }
-    if json_mode:
-        payload["format"] = "json"
-    r = httpx.post(f"{OLLAMA_URL}/api/chat", json=payload, timeout=120.0)
-    r.raise_for_status()
-    return r.json()["message"]["content"]
-
-
-# ---------------------------------------------------------------------------
-# transformers (Colab / when you want the raw weights)
-# ---------------------------------------------------------------------------
-
-_hf: dict[str, Any] = {}
-
-
-def _load_hf() -> None:
-    if _hf:
-        return
-    import torch
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-
-    name = os.environ.get("ITURN_HF_MODEL", "Qwen/Qwen2.5-3B-Instruct")
-    tok = AutoTokenizer.from_pretrained(name)
-    model = AutoModelForCausalLM.from_pretrained(
-        name,
-        dtype=torch.bfloat16,          # 5050 is Blackwell; bf16 is fine
-        device_map="auto",
-    )
-    _hf["tok"], _hf["model"], _hf["torch"] = tok, model, torch
-
-
-def _hf_chat(messages: list[dict], cfg: GenConfig, json_mode: bool = False) -> str:
-    _load_hf()
-    tok, model, torch = _hf["tok"], _hf["model"], _hf["torch"]
-    text = tok.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-    inputs = tok([text], return_tensors="pt").to(model.device)
-    with torch.no_grad():
-        out = model.generate(
-            **inputs,
-            max_new_tokens=128 if json_mode else cfg.max_tokens,
-            do_sample=not json_mode,
-            temperature=cfg.temperature,
-            top_p=cfg.top_p,
-            repetition_penalty=cfg.repeat_penalty,
-            pad_token_id=tok.eos_token_id,
-        )
-    return tok.decode(out[0][inputs.input_ids.shape[1]:], skip_special_tokens=True)
-
-
-# ---------------------------------------------------------------------------
-# stub
-# ---------------------------------------------------------------------------
-
-def _stub_chat(messages: list[dict], cfg: GenConfig, json_mode: bool = False) -> str:
-    if json_mode:
-        return "{}"
-    return "[stub backend] I hear you. Tell me a bit more about how that's been going."
-
-
-_BACKENDS = {"ollama": _ollama_chat, "transformers": _hf_chat, "stub": _stub_chat}
-
-
-def _chat(messages: list[dict], cfg: GenConfig | None = None, json_mode: bool = False) -> str:
-    return _BACKENDS[BACKEND](messages, cfg or GenConfig(), json_mode)
+def _chat(system: str, messages: list[dict], cfg: GenConfig | None = None,
+          json_mode: bool = False) -> str:
+    cfg = cfg or GenConfig()
+    return get_client().generate(
+        messages=messages,
+        system_prompt=system,
+        temperature=0.0 if json_mode else cfg.temperature,
+        top_p=cfg.top_p,
+        max_tokens=128 if json_mode else cfg.max_tokens,
+        repeat_penalty=cfg.repeat_penalty,
+        json_mode=json_mode,
+    ).text
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +71,7 @@ def _chat(messages: list[dict], cfg: GenConfig | None = None, json_mode: bool = 
 
 def reply(system: str, history: list[dict], cfg: GenConfig | None = None) -> str:
     """One conversational turn. Post-processed to strip small-model tics."""
-    raw = _chat([{"role": "system", "content": system}, *history], cfg)
-    return _clean(raw)
+    return _clean(_chat(system, history, cfg))
 
 
 _TICS = (
@@ -173,11 +113,8 @@ def extract(instruction: str, text: str, schema_hint: str, retries: int = 2) -> 
     )
     user = f"{instruction}\n\nMessage: \"\"\"{text}\"\"\""
     for _ in range(retries + 1):
-        raw = _chat(
-            [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            GenConfig(temperature=0.0),
-            json_mode=True,
-        )
+        raw = _chat(system, [{"role": "user", "content": user}],
+                    GenConfig(temperature=0.0), json_mode=True)
         parsed = _parse_json(raw)
         if parsed is not None:
             return parsed
@@ -215,18 +152,23 @@ def extract_likert(item_text: str, user_text: str) -> int | None:
     if m:
         return int(m.group(1))
 
-    result = extract(
-        instruction=(
-            "The person is responding to this statement about the past week: "
-            f"\"{item_text}\". On a 0-3 scale where "
-            "0 = did not apply to me at all, "
-            "1 = applied to some degree or some of the time, "
-            "2 = applied to a considerable degree or a good part of the time, "
-            "3 = applied very much or most of the time — "
-            "what rating did they express? Omit 'rating' unless it is unambiguous."
-        ),
-        text=user_text,
-        schema_hint='{"rating": 0|1|2|3}',
-    )
+    try:
+        result = extract(
+            instruction=(
+                "The person is responding to this statement about the past week: "
+                f"\"{item_text}\". On a 0-3 scale where "
+                "0 = did not apply to me at all, "
+                "1 = applied to some degree or some of the time, "
+                "2 = applied to a considerable degree or a good part of the time, "
+                "3 = applied very much or most of the time — "
+                "what rating did they express? Omit 'rating' unless it is unambiguous."
+            ),
+            text=user_text,
+            schema_hint='{"rating": 0|1|2|3}',
+        )
+    except AIError:
+        # The AI server is unreachable. The questionnaire itself is
+        # deterministic, so it carries on: None means "show the buttons".
+        return None
     val = result.get("rating")
     return val if isinstance(val, int) and 0 <= val <= 3 else None
