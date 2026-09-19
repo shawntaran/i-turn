@@ -82,7 +82,7 @@ database). Only `AI_BASE_URL` says where the first one is.
 ```bash
 pip install -r requirements.txt          # the app: no torch, no CUDA
 cp .env.example .env                     # then set AI_BASE_URL (and AI_API_KEY)
-uvicorn app.main:app --port 8000         # http://localhost:8000
+python -m uvicorn app.main:app --port 8000         # http://localhost:8000
 ```
 
 ### No GPU — model in Google Colab

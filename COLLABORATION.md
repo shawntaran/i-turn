@@ -112,7 +112,7 @@ Open `.env` and paste the two lines from the notebook over the existing
 
 **11. Start I-Turn**
 ```bash
-uvicorn app.main:app --port 8000
+python -m uvicorn app.main:app --port 8000
 ```
 On start-up it checks the AI server and tells you in the terminal whether it can
 reach it.

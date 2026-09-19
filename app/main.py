@@ -9,7 +9,7 @@ AI_BASE_URL (see .env.example, COLLABORATION.md and ai_server/server.py).
 
 Run:
     cp .env.example .env        # then set AI_BASE_URL
-    uvicorn app.main:app --reload --port 8000
+    python -m uvicorn app.main:app --reload --port 8000
 """
 
 from __future__ import annotations
