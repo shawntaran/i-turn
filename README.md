@@ -127,6 +127,14 @@ AI_ENGINE=stub python -m ai_server.server
 Canned model text, everything else real. Good enough to build the UI and the
 counsellor dashboard against.
 
+### Reading a counsellor briefing (development)
+
+```bash
+curl -H "Authorization: Bearer $ITURN_COUNSELLOR_TOKEN" \
+  "http://localhost:8080/api/counsellor/<pseudonym>/<session_id>?text=true"
+```
+Story-mode sessions only: Incognito keeps nothing on disk to brief from.
+
 ### Tests
 
 ```bash
@@ -145,6 +153,8 @@ The app (`.env`, see `.env.example`):
 | `AI_API_KEY` | *(empty)* | Bearer key, if the AI server requires one. The Colab notebook generates one. |
 | `AI_TIMEOUT` | `120` | Seconds to wait for one AI answer. |
 | `AI_MODEL` | *(empty)* | Optional, advisory model identifier sent with requests. |
+| `ITURN_COUNSELLOR_TOKEN` | *(empty)* | Bearer token for the counsellor / report / handoff / session-list / erase routes. Unset = those routes answer 503. |
+| `ITURN_ENABLE_DOCS` | *(empty)* | `1` publishes `/docs`; off by default. |
 
 The AI server (environment, see the docstring in `ai_server/server.py`):
 `AI_ENGINE`, `MODEL_NAME`, `AI_API_KEY`, `HOST`, `PORT`, `LOAD_IN_4BIT`, `OLLAMA_URL`.
@@ -193,7 +203,12 @@ the Google Form before pilot data collection — see the note in `dass21.py`.
 
 ## Not built yet, on purpose
 
-- **Counsellor auth.** `/api/handoff` is wide open. Do not expose this.
+- **Counsellor login.** The routes that read or delete stored data (`/api/counsellor/*`,
+  `/api/handoff/*`, `/api/report/*`, `/api/sessions/*`, `DELETE /api/data/*`) now need
+  a shared bearer token (`ITURN_COUNSELLOR_TOKEN`) and answer 503 without one. That is a
+  stopgap, not a login: one shared secret, no per-counsellor identity, no audit log of who
+  opened what. Students still have no secret of their own, so "delete my data" is
+  counsellor-mediated for now.
 - **Sessions are in-memory.** Restart the server, lose them.
 - **The crisis alert doesn't fire.** `notify_counsellor: True` is a flag nobody
   reads yet. This is the single most important thing to build next, and it

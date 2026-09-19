@@ -25,11 +25,12 @@ import os
 import re
 import time
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
+
+from .config import load_env
 
 log = logging.getLogger("iturn.ai")
 
@@ -306,11 +307,7 @@ def from_env() -> AIClient:
     A `.env` file at the repository root is read if present; real environment
     variables win over it.
     """
-    try:
-        from dotenv import load_dotenv
-        load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
-    except ImportError:  # python-dotenv is a convenience, not a requirement
-        pass
+    load_env()
 
     try:
         timeout = float(os.environ.get("AI_TIMEOUT") or DEFAULT_TIMEOUT)

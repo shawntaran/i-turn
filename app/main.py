@@ -14,20 +14,53 @@ Run:
 
 from __future__ import annotations
 
+import hmac
 import logging
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import db, llm, prompts, report, safety
+from .config import load_env
 from .instruments import dass21
 from .session import Mode, Session
 
+load_env()
 log = logging.getLogger("iturn")
+
+MIN_TOKEN_LENGTH = 16
+
+
+def _counsellor_token() -> str:
+    return os.environ.get("ITURN_COUNSELLOR_TOKEN", "").strip()
+
+
+def require_counsellor(authorization: str | None = Header(default=None)) -> None:
+    """
+    Gate for every route that reads or deletes stored student data.
+
+    Interim, deliberately simple: one shared token in ITURN_COUNSELLOR_TOKEN,
+    sent as `Authorization: Bearer <token>`. It fails CLOSED — with no token
+    configured these routes answer 503, they do not open up. The token is never
+    accepted in a URL (URLs end up in logs and browser history). Real
+    counsellor login replaces this; the routes already depend on this one
+    function, so that swap is a single change.
+    """
+    token = _counsellor_token()
+    if not token:
+        raise HTTPException(503, "Counsellor access is not configured on this server "
+                                 "(set ITURN_COUNSELLOR_TOKEN).")
+    scheme, _, supplied = (authorization or "").partition(" ")
+    ok = scheme.lower() == "bearer" and hmac.compare_digest(
+        supplied.strip().encode("utf-8"), token.encode("utf-8"))
+    if not ok:
+        raise HTTPException(401, "Counsellor authentication required.",
+                            headers={"WWW-Authenticate": "Bearer"})
 
 
 @asynccontextmanager
@@ -42,10 +75,23 @@ async def lifespan(_: FastAPI):
             log.warning("AI server reachable but %s (%s)", h["status"], h.get("detail", ""))
     except llm.AIError as e:
         log.warning("AI server not reachable: %s. Details: %s", e.message, e.detail)
+    token = _counsellor_token()
+    if not token:
+        log.warning("ITURN_COUNSELLOR_TOKEN is not set: the counsellor, report, handoff, "
+                    "session-list and erase routes are disabled (503) until it is.")
+    elif len(token) < MIN_TOKEN_LENGTH:
+        log.warning("ITURN_COUNSELLOR_TOKEN is too short (%d chars; use %d or more). "
+                    "Generate one: python -c \"import secrets; print(secrets.token_urlsafe(32))\"",
+                    len(token), MIN_TOKEN_LENGTH)
     yield
 
 
-app = FastAPI(title="I-Turn prototype", lifespan=lifespan)
+# The interactive API docs list every route; don't publish them unless asked.
+_docs = os.environ.get("ITURN_ENABLE_DOCS") == "1"
+app = FastAPI(title="I-Turn prototype", lifespan=lifespan,
+              docs_url="/docs" if _docs else None,
+              redoc_url="/redoc" if _docs else None,
+              openapi_url="/openapi.json" if _docs else None)
 
 
 @app.exception_handler(llm.AIError)
@@ -195,10 +241,11 @@ def end(req: ChoiceRequest) -> dict:
     return {"closed": True, "mode": s.mode.value, "report": close}
 
 
-@app.get("/api/report/{pseudonym}/{session_id}")
+@app.get("/api/report/{pseudonym}/{session_id}", dependencies=[Depends(require_counsellor)])
 def student_report(pseudonym: str, session_id: str) -> dict:
-    """Student's own view of a past Story-mode session. Rebuilt from SQLite,
-    so it works long after the tab closed."""
+    """A past Story-mode session's student-facing summary, rebuilt from SQLite.
+    Locked for now: a pseudonym is not a credential, and students have no
+    secret to present yet. The live close screen comes from /api/end."""
     conn = db.connect()
     r = report.student_close(conn, pseudonym, session_id)
     if r["when"] is None:
@@ -206,27 +253,25 @@ def student_report(pseudonym: str, session_id: str) -> dict:
     return r
 
 
-@app.get("/api/sessions/{pseudonym}")
+@app.get("/api/sessions/{pseudonym}", dependencies=[Depends(require_counsellor)])
 def sessions(pseudonym: str) -> dict:
     return {"pseudonym": pseudonym, "sessions": db.sessions_for(db.connect(), pseudonym)}
 
 
-@app.get("/api/handoff/{session_id}")
+@app.get("/api/handoff/{session_id}", dependencies=[Depends(require_counsellor)])
 def handoff(session_id: str) -> dict:
     """Live in-memory handoff. Works only while the session is open — kept for
     the Incognito case, where there is nothing on disk to rebuild from."""
     return _get(session_id).handoff()
 
 
-@app.get("/api/counsellor/{pseudonym}/{session_id}")
+@app.get("/api/counsellor/{pseudonym}/{session_id}", dependencies=[Depends(require_counsellor)])
 def counsellor(pseudonym: str, session_id: str,
                transcript: bool = False, text: bool = False):
     """
-    Level-5 briefing, rebuilt from disk.
-
-    NO AUTH. This is the prototype's single biggest hole — it serves a
-    counsellor's screen to anyone who can guess a pseudonym. Put this behind
-    real authentication before it leaves localhost.
+    Level-5 briefing, rebuilt from disk. Requires the counsellor token; see
+    require_counsellor. (Still to build: real per-counsellor login and an audit
+    log of who opened which briefing.)
     """
     conn = db.connect()
     h = report.counsellor_handoff(conn, pseudonym, session_id, include_transcript=transcript)
@@ -237,12 +282,12 @@ def counsellor(pseudonym: str, session_id: str,
     return h
 
 
-@app.post("/api/counsellor/{pseudonym}/{session_id}/acknowledge")
+@app.post("/api/counsellor/{pseudonym}/{session_id}/acknowledge", dependencies=[Depends(require_counsellor)])
 def acknowledge(pseudonym: str, session_id: str) -> dict:
     return {"updated": db.acknowledge_risk(db.connect(), pseudonym, session_id)}
 
 
-@app.delete("/api/data/{pseudonym}")
+@app.delete("/api/data/{pseudonym}", dependencies=[Depends(require_counsellor)])
 def erase(pseudonym: str) -> dict:
     conn = db.connect()
     return {"deleted": db.erase(conn, pseudonym), "note": "risk events retained per protocol"}
