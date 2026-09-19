@@ -3,3 +3,18 @@ __pycache__/
 iturn.db
 iturn.db-shm
 iturn.db-wal
+
+# Local configuration and secrets
+.env
+
+# Model files never belong in this repository. Models live in the AI server's
+# runtime (e.g. Colab), not here.
+*.safetensors
+*.gguf
+*.bin
+*.pt
+*.pth
+*.ckpt
+models/
+huggingface/
+.cache/
