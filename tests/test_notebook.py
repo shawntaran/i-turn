@@ -89,3 +89,16 @@ def test_trycloudflare_url_regex_matches_real_cloudflared_output():
 
 def test_this_test_module_imported_no_gpu_libraries():
     assert "torch" not in sys.modules
+
+
+def test_notebook_guards_against_stale_ports_and_flaky_tunnels():
+    cells = {c["id"]: src(c) for c in load()["cells"]}
+    start, tunnel = cells["start-server"], cells["tunnel"]
+    # a leftover server on the port must fail fast, not wait for a health check that can't succeed
+    assert "_port_in_use" in start and "already in use" in start
+    assert "ECONNREFUSED" in start
+    assert '"unauthorized"' in start                      # ...including one with a different key
+    # tunnel: download and URL acquisition are retried, with a reason when they give up
+    assert "for attempt in range(1, 4)" in tunnel
+    assert "--version" in tunnel
+    assert "429" in tunnel                                # rate-limit hint

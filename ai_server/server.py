@@ -83,12 +83,12 @@ DEFAULT_MODEL = "Qwen/Qwen2.5-3B-Instruct"
 
 class Message(BaseModel):
     role: Literal["system", "user", "assistant"]
-    content: str
+    content: str = Field(min_length=1)
 
 
 class GenerateRequest(BaseModel):
-    prompt: str | None = None
-    messages: list[Message] | None = None
+    prompt: str | None = Field(default=None, min_length=1)
+    messages: list[Message] | None = Field(default=None, min_length=1, max_length=200)
     system_prompt: str | None = None
     model: str | None = None
     temperature: float = Field(0.7, ge=0.0, le=2.0)

@@ -114,7 +114,7 @@ print("GPU:", torch.cuda.get_device_name(0),
 '''
 
 START_SERVER = '''\
-import json, os, secrets, subprocess, sys, time, urllib.error, urllib.request
+import errno, json, os, secrets, socket, subprocess, sys, time, urllib.error, urllib.request
 
 LOAD_TIMEOUT_MIN = 30
 
@@ -128,7 +128,23 @@ def _stop(proc):
             proc.kill()
 
 
+def _port_in_use(port):
+    # Free only if the connection is actively refused; anything else (accepted,
+    # or a busy listener that stops answering) means something is already there.
+    with socket.socket() as sock:
+        sock.settimeout(4)                    # Windows can take ~2s to report a refusal
+        return sock.connect_ex(("127.0.0.1", port)) not in (errno.ECONNREFUSED, 10061)
+
+
 _stop(globals().get("server_proc"))          # so this cell can be re-run safely
+for _ in range(8):                            # give the old one a moment to release the port
+    if not _port_in_use(PORT):
+        break
+    time.sleep(0.5)
+else:
+    raise RuntimeError(
+        f"Port {PORT} is already in use, probably by an earlier run of this notebook. "
+        "Change PORT in the Configuration cell, or use Runtime -> Restart session and run again.")
 
 AI_API_KEY = API_KEY.strip() or secrets.token_urlsafe(24)
 env = {
@@ -183,6 +199,9 @@ while time.time() < deadline:
         raise RuntimeError("The AI server process exited. The log above says why.")
     h = local_health()
     status = (h or {}).get("status")
+    if isinstance(h, dict) and isinstance(h.get("error"), dict) and h["error"].get("code") == "unauthorized":
+        raise RuntimeError("Something else is answering on this port with a different API key. "
+                           "Change PORT, or Runtime -> Restart session, and run again.")
     if status != last:
         print(f"[{time.strftime('%H:%M:%S')}] server status: {status or 'starting'}")
         last = status
@@ -204,30 +223,47 @@ import re
 
 # A Cloudflare "quick tunnel": free, no account, gives a public https URL.
 CLOUDFLARED = "./cloudflared"
-if not os.path.exists(CLOUDFLARED):
-    urllib.request.urlretrieve(
-        "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64",
-        CLOUDFLARED)
-    os.chmod(CLOUDFLARED, 0o755)
+CLOUDFLARED_URL = "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64"
 
-_stop(globals().get("tunnel_proc"))
-tunnel_proc = subprocess.Popen(
-    [CLOUDFLARED, "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--no-autoupdate"],
-    stdout=open("cloudflared.log", "w"), stderr=subprocess.STDOUT,
-)
+if not os.path.exists(CLOUDFLARED):
+    for attempt in range(1, 4):
+        try:
+            urllib.request.urlretrieve(CLOUDFLARED_URL, CLOUDFLARED)
+            os.chmod(CLOUDFLARED, 0o755)
+            break
+        except Exception as e:
+            print(f"cloudflared download failed (attempt {attempt}/3): {e}")
+            time.sleep(3)
+    else:
+        raise RuntimeError("Could not download cloudflared from GitHub. Check Colab's internet "
+                           "access and re-run this cell.")
+print(subprocess.run([CLOUDFLARED, "--version"], capture_output=True, text=True).stdout.strip())
 
 PUBLIC_URL = None
-for _ in range(60):
-    m = re.search(r"https://[a-z0-9-]+\\.trycloudflare\\.com", open("cloudflared.log").read())
-    if m:
-        PUBLIC_URL = m.group(0)
+for attempt in range(1, 4):
+    _stop(globals().get("tunnel_proc"))
+    tunnel_proc = subprocess.Popen(
+        [CLOUDFLARED, "tunnel", "--url", f"http://127.0.0.1:{PORT}", "--no-autoupdate"],
+        stdout=open("cloudflared.log", "w"), stderr=subprocess.STDOUT,
+    )
+    for _ in range(45):
+        m = re.search(r"https://[a-z0-9-]+\\.trycloudflare\\.com", open("cloudflared.log").read())
+        if m:
+            PUBLIC_URL = m.group(0)
+            break
+        if tunnel_proc.poll() is not None:
+            break
+        time.sleep(1)
+    if PUBLIC_URL:
         break
-    if tunnel_proc.poll() is not None:
-        break
-    time.sleep(1)
+    print(f"No tunnel URL yet (attempt {attempt}/3); trying again...")
+    time.sleep(3)
+
 if not PUBLIC_URL:
     print(open("cloudflared.log").read()[-3000:])
-    raise RuntimeError("cloudflared did not produce a public URL. The log above says why.")
+    raise RuntimeError("cloudflared did not produce a public URL after 3 tries. The log above "
+                       "says why (a 429 means Cloudflare is rate-limiting free tunnels; wait a "
+                       "few minutes and re-run this cell).")
 
 # The URL can take a few seconds to start resolving; confirm it reaches the server.
 reachable = False
