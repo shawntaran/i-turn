@@ -2,7 +2,7 @@
 Switch which AI server I-Turn talks to, without hand-editing .env.
 
     python switch_ai.py status              which server is active, and is it up?
-    python switch_ai.py local               your own machine (default http://localhost:8001)
+    python switch_ai.py local               your own machine (default http://127.0.0.1:8001)
     python switch_ai.py colab               the Colab endpoint saved last time
     python switch_ai.py colab --new         paste the banner from a fresh Colab run
     python switch_ai.py colab --url URL --key KEY
@@ -27,7 +27,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent
-LOCAL_DEFAULT = "http://localhost:8001"
+LOCAL_DEFAULT = "http://127.0.0.1:8001"     # not "localhost": ~2s slower per connection on Windows
 KEYS = ("AI_BASE_URL", "AI_API_KEY")
 _LINE = re.compile(r"^\s*(?:export\s+)?(AI_BASE_URL|AI_API_KEY)\s*=\s*(.*?)\s*$")
 
@@ -225,9 +225,21 @@ def cmd_switch(target: str, args, root: Path, out, stdin=None) -> int:
         print("A Colab endpoint needs its API key (AI_API_KEY). Nothing was changed.", file=out)
         return 1
 
+    # Switching away must not lose what was active. A hand-edited .env has no saved
+    # profile yet, so keep the outgoing target before overwriting it.
+    cur = read_active(root)
+    cur_url, cur_key = cur.get("AI_BASE_URL", ""), cur.get("AI_API_KEY", "")
+    outgoing = classify(cur_url)
+    kept = outgoing in ("local", "colab") and outgoing != target and bool(cur_url)
+    if kept:
+        save_profile(outgoing, normalise_base_url(cur_url), cur_key, root)
+
     save_profile(target, url, key, root)
     activate(url, key, root)
     print(f"Switched to {target}: {_describe(url, key)}", file=out)
+    if kept:
+        print(f"  (kept your previous {outgoing} settings; switch back with: "
+              f"python switch_ai.py {outgoing})", file=out)
     rc = _report_and_hint(url, key, target, out)
     print("Restart the app to apply (or run it with --reload --reload-include .env).", file=out)
     return rc

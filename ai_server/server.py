@@ -51,7 +51,7 @@ CONFIGURATION (environment)
     AI_API_KEY    if set, every request must send "Authorization: Bearer <key>"
     HOST / PORT   where to listen                        (default: 127.0.0.1:8001)
     LOAD_IN_4BIT  "1" to load the transformers model in 4-bit (needs bitsandbytes)
-    OLLAMA_URL    (default: http://localhost:11434)
+    OLLAMA_URL    (default: http://127.0.0.1:11434)
 
 Run:  python -m ai_server.server          (from the repository root)
 """
@@ -187,13 +187,16 @@ class OllamaEngine(Engine):
 
     name = "ollama"
 
-    def __init__(self, model: str, url: str = "http://localhost:11434"):
+    def __init__(self, model: str, url: str = "http://127.0.0.1:11434"):
         super().__init__(model)
         self.url = url.rstrip("/")
+        # One pooled client: a fresh connection per call costs ~0.7s on Windows
+        # (~2.7s via "localhost"), which dwarfs generation time on a small model.
+        self._http = httpx.Client(timeout=300, limits=httpx.Limits(keepalive_expiry=60.0))
 
     def load(self) -> None:
         try:
-            tags = httpx.get(f"{self.url}/api/tags", timeout=10).json()
+            tags = self._http.get(f"{self.url}/api/tags", timeout=10).json()
         except (httpx.HTTPError, ValueError) as e:
             raise EngineError("model_error", f"Ollama not reachable at {self.url}: {e}") from e
         names = {m.get("name") for m in tags.get("models", [])}
@@ -212,7 +215,7 @@ class OllamaEngine(Engine):
         if p.json_mode:
             payload["format"] = "json"
         try:
-            r = httpx.post(f"{self.url}/api/chat", json=payload, timeout=300)
+            r = self._http.post(f"{self.url}/api/chat", json=payload)
             r.raise_for_status()
             body = r.json()
         except (httpx.HTTPError, ValueError) as e:
@@ -318,7 +321,7 @@ def build_engine(name: str, model: str) -> Engine:
     if name == "stub":
         return StubEngine(model or "stub")
     if name == "ollama":
-        return OllamaEngine(model, os.environ.get("OLLAMA_URL", "http://localhost:11434"))
+        return OllamaEngine(model, os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434"))
     if name == "transformers":
         return TransformersEngine(model, load_in_4bit=os.environ.get("LOAD_IN_4BIT") == "1")
     raise ValueError(f"unknown AI_ENGINE {name!r} (use transformers, ollama or stub)")

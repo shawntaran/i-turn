@@ -101,7 +101,7 @@ device`. Ollama sidesteps this entirely, so it is the easy local route:
 ```bash
 ollama pull qwen2.5:3b-instruct-q4_K_M
 AI_ENGINE=ollama MODEL_NAME=qwen2.5:3b-instruct-q4_K_M python -m ai_server.server
-# .env:  AI_BASE_URL=http://localhost:8001
+# .env:  AI_BASE_URL=http://127.0.0.1:8001
 ```
 
 Or load the weights directly (needs CUDA 12.8 wheels):
@@ -149,7 +149,7 @@ The app (`.env`, see `.env.example`):
 
 | Var | Default | |
 |---|---|---|
-| `AI_BASE_URL` | `http://localhost:8001` | Where the AI server is. The only thing that changes between local and Colab. |
+| `AI_BASE_URL` | `http://127.0.0.1:8001` | Where the AI server is. The only thing that changes between local and Colab. |
 | `AI_API_KEY` | *(empty)* | Bearer key, if the AI server requires one. The Colab notebook generates one. |
 | `AI_TIMEOUT` | `120` | Seconds to wait for one AI answer. |
 | `AI_MODEL` | *(empty)* | Optional, advisory model identifier sent with requests. |

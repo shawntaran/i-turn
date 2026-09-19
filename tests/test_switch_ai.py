@@ -36,7 +36,7 @@ AI_API_KEY={SECRET}
 
 TEMPLATE = """# Where the AI server lives.
 # AI_BASE_URL=https://old-commented-out.trycloudflare.com
-AI_BASE_URL=http://localhost:8001
+AI_BASE_URL=http://127.0.0.1:8001
 
 AI_API_KEY=
 AI_TIMEOUT=45
@@ -131,7 +131,7 @@ def test_first_switch_creates_env_from_the_template(root):
     rc, out = run(root, "local")
     assert rc == 0 and "Switched to local" in out
     env = env_text(root)
-    assert "AI_BASE_URL=http://localhost:8001" in env
+    assert "AI_BASE_URL=http://127.0.0.1:8001" in env
     assert "AI_TIMEOUT=45" in env                                   # template kept
 
 
@@ -140,7 +140,7 @@ def test_switching_back_and_forth_remembers_each_profile(root):
     assert switch_ai.read_active(root)["AI_BASE_URL"] == "https://one.trycloudflare.com"
 
     assert run(root, "local")[0] == 0
-    assert switch_ai.read_active(root) == {"AI_BASE_URL": "http://localhost:8001", "AI_API_KEY": ""}
+    assert switch_ai.read_active(root) == {"AI_BASE_URL": "http://127.0.0.1:8001", "AI_API_KEY": ""}
 
     # No paste, no flags: comes back from the saved Colab profile.
     rc, out = run(root, "colab")
@@ -260,3 +260,39 @@ def test_profile_files_are_git_ignored():
     gitignore = (Path(switch_ai.ROOT) / ".gitignore").read_text(encoding="utf-8")
     assert ".env" in gitignore.splitlines() and ".env.*" in gitignore.splitlines()
     assert "!.env.example" in gitignore.splitlines()
+
+
+def test_local_defaults_use_the_ipv4_loopback_not_localhost():
+    """On Windows 'localhost' tries IPv6 first and waits ~2s for the refusal, on every
+    new connection: 4x slower local turns, found by actually running the app."""
+    from app import ai_client
+    from ai_server.server import OllamaEngine, build_engine
+    assert "localhost" not in ai_client.DEFAULT_BASE_URL and "localhost" not in switch_ai.LOCAL_DEFAULT
+    assert "localhost" not in OllamaEngine("m").url
+    assert "localhost" not in build_engine("ollama", "m").url
+
+
+def test_switching_away_keeps_a_hand_edited_env_target(root):
+    """A .env edited by hand has no saved profile. Switching to local must not
+    silently destroy the Colab address and key that were in it."""
+    (root / ".env").write_text(f"AI_BASE_URL=https://hand-edited.trycloudflare.com\nAI_API_KEY={SECRET}\n")
+    rc, out = run(root, "local")
+    assert rc == 0 and "kept your previous colab settings" in out and SECRET not in out
+    assert switch_ai.read_active(root)["AI_BASE_URL"] == "http://127.0.0.1:8001"
+
+    rc, _ = run(root, "colab")                         # no paste, no flags: it was kept
+    assert rc == 0
+    assert switch_ai.read_active(root) == {
+        "AI_BASE_URL": "https://hand-edited.trycloudflare.com", "AI_API_KEY": SECRET}
+
+
+def test_switching_to_the_same_kind_does_not_clobber_its_profile(root):
+    run(root, "colab", "--url", "https://first.trycloudflare.com", "--key", "k1")
+    run(root, "colab", "--url", "https://second.trycloudflare.com", "--key", "k2")
+    assert switch_ai.load_profile("colab", root)["AI_BASE_URL"] == "https://second.trycloudflare.com"
+
+
+def test_a_custom_server_is_not_saved_as_local_or_colab(root):
+    (root / ".env").write_text("AI_BASE_URL=https://ai.example.com\nAI_API_KEY=x\n")
+    run(root, "local")
+    assert not (root / ".env.colab").exists() and not (root / ".env.custom").exists()

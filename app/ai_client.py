@@ -34,7 +34,9 @@ from .config import load_env
 
 log = logging.getLogger("iturn.ai")
 
-DEFAULT_BASE_URL = "http://localhost:8001"
+# 127.0.0.1, never "localhost": on Windows "localhost" tries IPv6 first and waits
+# ~2s for the refusal before falling back, on every new connection.
+DEFAULT_BASE_URL = "http://127.0.0.1:8001"
 DEFAULT_TIMEOUT = 120.0
 CONNECT_TIMEOUT = 10.0
 
@@ -60,7 +62,7 @@ _USER_MESSAGES = {
     ),
     "bad_url": (
         "AI_BASE_URL is not a valid URL. It should look like "
-        "https://xxxxx.trycloudflare.com or http://localhost:8001."
+        "https://xxxxx.trycloudflare.com or http://127.0.0.1:8001."
     ),
     "timeout": "The AI service took too long to respond. Try again in a moment.",
     "interrupted": "The connection to the AI service was interrupted. Try again.",
@@ -133,7 +135,10 @@ class AIClient:
             log.warning("AI_BASE_URL is plain http:// to a remote host; the API key will be "
                         "sent unencrypted. Use https://.")
         self._http = httpx.Client(
-            timeout=httpx.Timeout(timeout, connect=min(CONNECT_TIMEOUT, timeout))
+            timeout=httpx.Timeout(timeout, connect=min(CONNECT_TIMEOUT, timeout)),
+            # Keep connections around between a student's messages instead of
+            # paying to reconnect (a TLS handshake through a tunnel) on every one.
+            limits=httpx.Limits(keepalive_expiry=20.0),
         )
 
     # -- public ---------------------------------------------------------------

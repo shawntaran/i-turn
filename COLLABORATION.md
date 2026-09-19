@@ -196,7 +196,7 @@ address per target and flips between them:
 
 ```bash
 python switch_ai.py status               # what am I using, and is it up?
-python switch_ai.py local                # your own machine (http://localhost:8001)
+python switch_ai.py local                # your own machine (http://127.0.0.1:8001)
 python switch_ai.py colab                # the Colab address you used last time
 python switch_ai.py colab --new          # paste the banner from a fresh Colab run
 ```
@@ -236,7 +236,7 @@ docstring at the top of the file).
 ```bash
 pip install -r ai_server/requirements.txt          # torch: see pytorch.org for your CUDA
 AI_ENGINE=transformers MODEL_NAME=Qwen/Qwen2.5-3B-Instruct python -m ai_server.server
-# then in .env:  AI_BASE_URL=http://localhost:8001
+# then in .env:  AI_BASE_URL=http://127.0.0.1:8001
 ```
 
 **With Ollama** already installed:
