@@ -2,361 +2,192 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="color-scheme" content="light dark">
+<meta name="description" content="A quiet place to talk about how you're doing. No account, no real name.">
 <title>I-Turn</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300&display=swap" rel="stylesheet">
-<style>
-:root{
-  --ground:#EDEAE3; --surface:#F7F5F0; --ink:#22271F; --muted:#6E756B;
-  --accent:#4E6A50; --accent-soft:#DDE4DA; --line:#D6D2C8; --warn:#8A5A2B;
-  --serif:'Newsreader',Georgia,serif;
-  --sans:system-ui,-apple-system,'Segoe UI',sans-serif;
-}
-:root:not([data-theme=light]){ }
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme=light]){
-    --ground:#161A15; --surface:#1D221C; --ink:#E4E2D9; --muted:#8E958A;
-    --accent:#9BB59B; --accent-soft:#283028; --line:#2F362E; --warn:#C89860;
-  }
-}
-:root[data-theme=dark]{
-  --ground:#161A15; --surface:#1D221C; --ink:#E4E2D9; --muted:#8E958A;
-  --accent:#9BB59B; --accent-soft:#283028; --line:#2F362E; --warn:#C89860;
-}
-*{box-sizing:border-box}
-body{
-  margin:0; background:var(--ground); color:var(--ink);
-  font-family:var(--serif); font-size:18px; line-height:1.6;
-  -webkit-font-smoothing:antialiased;
-}
-.wrap{max-width:38rem;margin:0 auto;padding:2rem 1.25rem 8rem;min-height:100vh}
-
-/* --- gate --- */
-.gate{padding-top:14vh}
-.gate h1{
-  font-weight:300; font-size:2.6rem; line-height:1.15; margin:0 0 .5rem;
-  letter-spacing:-.02em;
-}
-.gate p{color:var(--muted);margin:0 0 2rem;max-width:30rem}
-.field{margin-bottom:1.1rem}
-.field label{display:block;font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:.35rem}
-input[type=text],select{
-  width:100%;padding:.7rem .85rem;font:inherit;font-size:1rem;
-  background:var(--surface);color:var(--ink);
-  border:1px solid var(--line);border-radius:3px;
-}
-input:focus-visible,select:focus-visible,button:focus-visible{
-  outline:2px solid var(--accent);outline-offset:2px;
-}
-.modes{display:grid;gap:.6rem}
-.mode{
-  display:block;padding:.85rem 1rem;border:1px solid var(--line);
-  border-radius:3px;background:var(--surface);cursor:pointer;
-}
-.mode[aria-pressed=true]{border-color:var(--accent);background:var(--accent-soft)}
-.mode b{display:block;font-weight:500}
-.mode span{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
-.notice{
-  font-family:var(--sans);font-size:.82rem;color:var(--muted);
-  border-left:2px solid var(--line);padding:.2rem 0 .2rem .9rem;margin:1.6rem 0;
-}
-.notice strong{color:var(--ink);font-weight:600}
-button.go{
-  font:inherit;font-size:1rem;padding:.7rem 1.6rem;cursor:pointer;
-  background:var(--accent);color:var(--ground);border:none;border-radius:3px;
-}
-
-/* --- conversation --- */
-.turn{margin:0 0 1.6rem;max-width:32rem}
-.turn.me{margin-left:auto;text-align:right}
-.turn.me .body{
-  display:inline-block;text-align:left;background:var(--accent-soft);
-  padding:.55rem .9rem;border-radius:3px;
-}
-.turn.them .body{white-space:pre-wrap}
-.turn.sys .body{
-  font-family:var(--sans);font-size:.88rem;border-left:2px solid var(--warn);
-  padding:.6rem 0 .6rem .9rem;white-space:pre-wrap;
-}
-.turn.sys .body strong{color:var(--warn)}
-
-/* --- instrument interlude --- */
-.item{
-  border-top:1px solid var(--line);border-bottom:1px solid var(--line);
-  padding:1.1rem 0;margin:1.6rem 0;
-}
-.item .frame{font-family:var(--sans);font-size:.75rem;color:var(--muted);margin-bottom:.5rem}
-.item .stmt{font-size:1.15rem;font-weight:400;margin:0 0 .9rem}
-.anchors{display:grid;gap:.35rem}
-.anchor{
-  font:inherit;font-size:.92rem;text-align:left;cursor:pointer;
-  padding:.5rem .75rem;background:var(--surface);color:var(--ink);
-  border:1px solid var(--line);border-radius:3px;
-}
-.anchor:hover{border-color:var(--accent)}
-.anchor b{font-weight:500;margin-right:.5rem;color:var(--accent)}
-.progress{font-family:var(--sans);font-size:.72rem;color:var(--muted);margin-top:.8rem}
-
-/* --- offer --- */
-.offer{margin:1.4rem 0}
-.offer .actions{display:flex;gap:.6rem;margin-top:.7rem}
-.offer button{
-  font:inherit;font-size:.92rem;padding:.45rem 1.1rem;cursor:pointer;
-  border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:3px;
-}
-.offer button.yes{background:var(--accent);color:var(--ground);border-color:var(--accent)}
-
-/* --- results --- */
-.bands{margin:1.4rem 0;border-top:1px solid var(--line)}
-.band{display:flex;justify-content:space-between;align-items:baseline;
-  padding:.6rem 0;border-bottom:1px solid var(--line)}
-.band .n{font-family:var(--sans);font-size:.8rem;color:var(--muted)}
-.band .v{font-size:1.05rem}
-
-/* --- composer --- */
-.composer{
-  position:fixed;left:0;right:0;bottom:0;background:var(--ground);
-  border-top:1px solid var(--line);padding:.9rem 1.25rem;
-}
-.composer .inner{max-width:38rem;margin:0 auto;display:flex;gap:.6rem;align-items:flex-end}
-textarea{
-  flex:1;font:inherit;font-size:1rem;resize:none;min-height:2.6rem;max-height:9rem;
-  padding:.55rem .8rem;background:var(--surface);color:var(--ink);
-  border:1px solid var(--line);border-radius:3px;
-}
-textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.composer button{
-  font:inherit;font-size:.95rem;padding:.55rem 1.1rem;cursor:pointer;
-  background:var(--accent);color:var(--ground);border:none;border-radius:3px;
-}
-.composer button.ghost{background:transparent;color:var(--muted);border:1px solid var(--line)}
-.composer button.ghost:hover{color:var(--ink);border-color:var(--accent)}
-.close{border-top:1px solid var(--line);margin-top:2rem;padding-top:1.4rem}
-.close h2{font-weight:300;font-size:1.5rem;margin:0 0 .3rem;letter-spacing:-.01em}
-.close .meta{font-family:var(--sans);font-size:.78rem;color:var(--muted);margin-bottom:1.2rem}
-.close .said{border-left:2px solid var(--line);padding-left:.9rem;margin:.6rem 0}
-.close .said .what{font-family:var(--sans);font-size:.75rem;color:var(--muted)}
-.close .note{color:var(--muted);font-size:.95rem;margin:.8rem 0 0}
-.close ul{padding-left:1.1rem;margin:.8rem 0 0}
-.close li{margin-bottom:.4rem}
-.hidden{display:none}
-.thinking{color:var(--muted);font-style:italic}
-@media (prefers-reduced-motion:no-preference){
-  .turn{animation:rise .25s ease-out}
-  @keyframes rise{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
-}
-</style>
+<script>
+  /* Apply the saved theme before first paint so there is no flash. */
+  try {
+    var t = localStorage.getItem('iturn-theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
+<link rel="stylesheet" href="/static/css/app.css">
 </head>
 <body>
 
-<div class="wrap">
+<!-- Icons: inline so nothing is fetched from anywhere else. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-support" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><line x1="4.93" y1="4.93" x2="9.17" y2="9.17"/><line x1="14.83" y1="14.83" x2="19.07" y2="19.07"/><line x1="14.83" y1="9.17" x2="19.07" y2="4.93"/><line x1="4.93" y1="19.07" x2="9.17" y2="14.83"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+    <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+    <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  </defs>
+</svg>
 
-  <section id="gate" class="gate">
-    <h1>Tell me what's happening.</h1>
-    <p>No account, no real name. Start wherever you want — there's no right way in.</p>
+<a class="skip" href="#main">Skip to content</a>
+<div id="offline" class="banner" role="status" hidden>You're offline. Your message will be here when you're back.</div>
 
-    <div class="field">
-      <label for="pseudonym">Pick a name to go by</label>
-      <input type="text" id="pseudonym" value="U_83F91A" autocomplete="off">
+<header class="topbar">
+  <div class="topbar__in">
+    <div class="brand">
+      <span class="brand__mark" aria-hidden="true"></span>
+      <span class="brand__name">I-Turn</span>
+      <span class="chip" id="pilot-chip">University Pilot</span>
+      <span class="dot" id="dev-dot" hidden title="AI server status"></span>
     </div>
-
-    <div class="field">
-      <label for="language">Language</label>
-      <select id="language"></select>
+    <div class="topbar__actions">
+      <button type="button" class="icon-btn" id="theme" aria-label="Switch to dark theme">
+        <svg class="icon" aria-hidden="true"><use href="#i-moon"/></svg>
+      </button>
+      <button type="button" class="help-link" id="help-open">
+        <svg class="icon" aria-hidden="true"><use href="#i-support"/></svg>
+        <span>Need help now?</span>
+      </button>
     </div>
+  </div>
+</header>
 
-    <div class="field">
-      <label>How should this be remembered?</label>
-      <div class="modes">
-        <button type="button" class="mode" data-mode="incognito" aria-pressed="true">
-          <b>Incognito</b><span>Nothing is kept. Close the tab and it's gone.</span>
-        </button>
-        <button type="button" class="mode" data-mode="story" aria-pressed="false">
-          <b>Story</b><span>Remembers you between visits. Delete it whenever.</span>
-        </button>
+<main id="main" class="shell" tabindex="-1">
+
+  <!-- ============ 1 · Welcome ============ -->
+  <section id="gate" class="gate" aria-labelledby="gate-title">
+    <h1 id="gate-title" class="display">Tell me what’s happening.</h1>
+    <p class="lede">No account, no real name. Start wherever you want — there’s no right way in.</p>
+
+    <form id="gate-form" novalidate>
+      <div class="field">
+        <label class="label" for="pseudonym">Pick a name to go by</label>
+        <div class="input-wrap">
+          <input id="pseudonym" class="input" type="text" minlength="3" maxlength="40"
+                 autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="name-hint">
+          <button type="button" class="input-btn" id="shuffle" aria-label="Suggest another name" title="Suggest another name">
+            <svg class="icon" aria-hidden="true"><use href="#i-shuffle"/></svg>
+          </button>
+        </div>
+        <p class="hint" id="name-hint">Use 3–40 characters. Not your real name.</p>
       </div>
-    </div>
 
-    <div class="notice" id="notice"></div>
-    <button class="go" id="begin">Start talking</button>
+      <div class="field field--row">
+        <span class="label">Conversation language</span>
+        <span class="lang"><span class="lang__now">English</span><span class="lang__next">Hindi, Kannada, Tamil coming next</span></span>
+      </div>
+
+      <fieldset class="field modes">
+        <legend class="label">Choose your mode</legend>
+        <div class="modes__grid">
+          <label class="mode">
+            <input type="radio" name="mode" value="incognito" checked>
+            <span class="mode__card">
+              <span class="mode__top"><span class="mode__title">Incognito</span>
+                <svg class="icon mode__on" aria-hidden="true"><use href="#i-check-circle"/></svg>
+                <svg class="icon mode__off" aria-hidden="true"><use href="#i-circle"/></svg></span>
+              <span class="mode__text">Nothing is kept. Close the tab and it’s gone.</span>
+            </span>
+          </label>
+          <label class="mode">
+            <input type="radio" name="mode" value="story">
+            <span class="mode__card">
+              <span class="mode__top"><span class="mode__title">Story</span>
+                <svg class="icon mode__on" aria-hidden="true"><use href="#i-check-circle"/></svg>
+                <svg class="icon mode__off" aria-hidden="true"><use href="#i-circle"/></svg></span>
+              <span class="mode__text">Remembers you between visits. Delete it whenever.</span>
+            </span>
+          </label>
+        </div>
+      </fieldset>
+
+      <div class="consent" id="consent" hidden>
+        <label class="check">
+          <input type="checkbox" id="consent-check" aria-describedby="consent-err">
+          <span>I understand this conversation will be saved under this name, and I can ask for it to be deleted.</span>
+        </label>
+        <p class="hint hint--warn" id="consent-err" role="alert" hidden>Please tick this to use Story mode, or choose Incognito.</p>
+      </div>
+
+      <article class="notice" aria-labelledby="notice-title">
+        <h2 class="notice__title" id="notice-title">Privacy notice</h2>
+        <div id="notice-body" class="notice__body"><p>Loading…</p></div>
+      </article>
+
+      <p class="form-error" id="gate-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn--primary btn--block" id="begin">
+        <span id="begin-label">Start talking</span>
+        <svg class="icon" aria-hidden="true"><use href="#i-arrow-right"/></svg>
+      </button>
+      <p class="ai-note">I’m an AI, not a person.</p>
+    </form>
+
+    <p class="fine">I-Turn isn’t a substitute for professional care, and it isn’t for emergencies.</p>
   </section>
 
-  <section id="convo" class="hidden"></section>
-</div>
+  <!-- ============ 2 · Conversation ============ -->
+  <section id="chat" class="chat" aria-label="Conversation" hidden>
+    <p class="modeline" id="modeline"></p>
+    <div id="thread" class="thread" role="log" aria-label="Conversation" aria-live="off"></div>
+  </section>
+</main>
 
-<div class="composer hidden" id="composer">
-  <div class="inner">
-    <textarea id="input" rows="1" placeholder="Whatever's on your mind."></textarea>
-    <button id="send">Send</button>
-    <button id="end" class="ghost" title="Finish and see a summary">Done</button>
+<form id="composer" class="composer" hidden autocomplete="off">
+  <div class="composer__in">
+    <div class="composer__row">
+      <label for="input" class="sr-only">Your message</label>
+      <textarea id="input" rows="1" maxlength="4000" placeholder="Whatever’s on your mind."
+                aria-describedby="count"></textarea>
+      <button type="submit" class="send" id="send" aria-label="Send" disabled>
+        <svg class="icon" aria-hidden="true"><use href="#i-send"/></svg>
+      </button>
+      <button type="button" class="btn btn--ghost btn--sm" id="done">Done</button>
+    </div>
+    <p class="count" id="count" hidden></p>
   </div>
-</div>
+</form>
 
-<script>
-const $ = s => document.querySelector(s);
-let SID = null, MODE = 'incognito';
+<button type="button" class="jump" id="jump" hidden>
+  <svg class="icon" aria-hidden="true"><use href="#i-arrow-down"/></svg><span>Jump to latest</span>
+</button>
 
-async function api(path, opts={}) {
-  const r = await fetch(path, {
-    headers: {'Content-Type':'application/json'},
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined,
-  });
-  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).detail || r.statusText);
-  return r.json();
-}
+<!-- Need help now? -->
+<dialog id="help" class="sheet" aria-labelledby="help-title">
+  <div class="sheet__in">
+    <div class="sheet__head">
+      <h2 id="help-title" class="headline">Talk to someone now</h2>
+      <button type="button" class="icon-btn" data-close aria-label="Close">
+        <svg class="icon" aria-hidden="true"><use href="#i-x"/></svg>
+      </button>
+    </div>
+    <p class="sheet__lede">These are people, not a program. Calling is free, and you don’t have to explain yourself first.</p>
+    <div id="help-rows" class="resources"></div>
+  </div>
+</dialog>
 
-// ---- boot
-(async () => {
-  const meta = await api('/api/meta');
-  $('#language').innerHTML = meta.languages.map(l=>`<option>${l}</option>`).join('');
-  $('#notice').innerHTML = meta.privacy_notice
-    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
-    .replace(/\n\n/g,'<br><br>');
-})();
+<!-- Finish? -->
+<dialog id="finish" class="sheet sheet--small" aria-labelledby="finish-title">
+  <form method="dialog" class="sheet__in">
+    <h2 id="finish-title" class="headline">Finish this conversation?</h2>
+    <p class="sheet__lede" id="finish-text"></p>
+    <div class="sheet__actions">
+      <button type="button" class="btn btn--secondary" data-close>Keep talking</button>
+      <button type="button" class="btn btn--primary" id="finish-yes">Finish</button>
+    </div>
+  </form>
+</dialog>
 
-document.querySelectorAll('.mode').forEach(b => b.onclick = () => {
-  document.querySelectorAll('.mode').forEach(x => x.setAttribute('aria-pressed','false'));
-  b.setAttribute('aria-pressed','true');
-  MODE = b.dataset.mode;
-});
+<div id="announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+<div id="alert-announcer" class="sr-only" aria-live="assertive" aria-atomic="true"></div>
 
-$('#begin').onclick = async () => {
-  const res = await api('/api/start', {method:'POST', body:{
-    pseudonym: $('#pseudonym').value.trim() || 'anon',
-    mode: MODE,
-    language: $('#language').value,
-  }});
-  SID = res.session_id;
-  $('#gate').classList.add('hidden');
-  $('#convo').classList.remove('hidden');
-  $('#composer').classList.remove('hidden');
-  say('them', res.returning
-    ? "Good to see you again. Where did we leave things?"
-    : "I'm listening. Take your time.");
-  $('#input').focus();
-};
-
-// ---- rendering
-function el(html){ const d=document.createElement('div'); d.innerHTML=html.trim(); return d.firstElementChild; }
-function push(node){ $('#convo').append(node); node.scrollIntoView({block:'end', behavior:'smooth'}); }
-
-function say(who, text){
-  const cls = who==='me'?'me':who==='sys'?'sys':'them';
-  push(el(`<div class="turn ${cls}"><div class="body"></div></div>`));
-  $('#convo').lastElementChild.querySelector('.body').innerHTML =
-    text.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>');
-}
-
-function renderOffer(offer){
-  const n = el(`<div class="offer">
-    <div class="turn them"><div class="body">${offer.prompt}</div></div>
-    <div class="actions">
-      <button class="yes">${offer.actions[0]}</button>
-      <button class="no">${offer.actions[1]}</button>
-    </div></div>`);
-  n.querySelector('.yes').onclick = async () => {
-    n.querySelector('.actions').remove();
-    handle(await api('/api/instrument/accept',{method:'POST',body:{session_id:SID}}));
-  };
-  n.querySelector('.no').onclick = async () => {
-    n.querySelector('.actions').remove();
-    handle(await api('/api/instrument/decline',{method:'POST',body:{session_id:SID}}));
-  };
-  push(n);
-}
-
-function renderItem(item, suggested){
-  const n = el(`<div class="item">
-    <div class="frame">Over the past week — statement ${item.number} of 21</div>
-    <p class="stmt">${item.text}</p>
-    <div class="anchors"></div>
-    <div class="progress"></div>
-  </div>`);
-  const box = n.querySelector('.anchors');
-  Object.entries(item.anchors).forEach(([v,label]) => {
-    const b = el(`<button class="anchor"><b>${v}</b>${label}</button>`);
-    if (String(suggested)===v) b.style.borderColor='var(--accent)';
-    b.onclick = async () => {
-      n.querySelector('.anchors').remove();
-      n.querySelector('.progress').textContent = `You answered: ${v} — ${label}`;
-      handle(await api('/api/instrument/answer',{method:'POST',
-        body:{session_id:SID, item:item.number, value:Number(v)}}));
-    };
-    box.append(b);
-  });
-  push(n);
-}
-
-function renderResult(r){
-  const rows = Object.entries(r.bands).map(([k,v]) =>
-    `<div class="band"><span class="n">${k}</span><span class="v">${v}</span></div>`).join('');
-  push(el(`<div class="bands">${rows}</div>`));
-}
-
-// ---- the one dispatcher
-function handle(res){
-  if (res.message) say(res.session_halted ? 'sys' : 'them', res.message);
-  if (res.offer) renderOffer(res.offer);
-  if (res.result) renderResult(res.result);
-  if (res.item) renderItem(res.item, res.suggested);
-  if (res.items) res.items.slice(0,1).forEach(i => renderItem(i));
-  if (res.session_halted) { $('#composer').classList.add('hidden'); }
-}
-
-// ---- composer
-const ta = $('#input');
-ta.addEventListener('input', () => { ta.style.height='auto'; ta.style.height=ta.scrollHeight+'px'; });
-ta.addEventListener('keydown', e => {
-  if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); send(); }
-});
-$('#send').onclick = send;
-$('#end').onclick = endSession;
-
-async function endSession(){
-  if (!SID) return;
-  const res = await api('/api/end', {method:'POST', body:{session_id:SID}});
-  renderClose(res.report, res.mode);
-  $('#composer').classList.add('hidden');
-  SID = null;
-}
-
-function renderClose(r, mode){
-  const said = (r.you_talked_about || []).map(x =>
-    `<div class="said"><div class="what">${x.about}</div>${x.you_said}</div>`).join('');
-  const bands = r.screening_bands
-    ? Object.entries(r.screening_bands).map(([k,v]) =>
-        `<div class="band"><span class="n">${k}</span><span class="v">${v}</span></div>`).join('')
-    : '';
-  const next = (r.next || []).map(n => `<li>${n}</li>`).join('');
-  push(el(`<div class="close">
-    <h2>That's where we'll leave it.</h2>
-    <div class="meta">${r.length || ''}${r.ephemeral ? ' · nothing was kept' : ''}</div>
-    ${said}
-    ${bands ? `<div class="bands">${bands}</div>` : ''}
-    <p class="note">${r.screening_note || ''}</p>
-    <ul>${next}</ul>
-  </div>`));
-}
-
-async function send(){
-  const text = ta.value.trim();
-  if (!text || !SID) return;
-  ta.value=''; ta.style.height='auto';
-  say('me', text);
-  const pending = el(`<div class="turn them"><div class="body thinking">…</div></div>`);
-  push(pending);
-  try {
-    const res = await api('/api/turn',{method:'POST',body:{session_id:SID, text}});
-    pending.remove();
-    handle(res);
-  } catch (err) {
-    pending.remove();
-    say('sys', `That didn't go through: ${err.message}`);
-  }
-}
-</script>
+<script src="/static/js/app.js" defer></script>
 </body>
 </html>

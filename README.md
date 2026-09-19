@@ -48,7 +48,10 @@ app/                     the application — no model, no torch, no CUDA
   instruments/
     dass21.py            verbatim items, scoring, bands
     lifestyle.py         slot schema for conversational extraction
-static/index.html        open-ended chat UI
+static/index.html        the student UI (markup)
+static/css/app.css       design tokens + components; light and dark; no framework
+static/js/app.js         UI logic; talks to the JSON API only; no framework, no innerHTML
+static/fonts/            where Newsreader / Work Sans go (see its README)
 switch_ai.py             flip .env between your local AI server and Colab
 ai_server/
   server.py              the AI server: HTTP contract + engines (transformers | ollama | stub)

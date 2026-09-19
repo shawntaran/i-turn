@@ -149,8 +149,8 @@ def test_the_student_ui_calls_no_locked_route():
     """Guard against the UI quietly growing a dependency on a locked route."""
     import re
     from pathlib import Path
-    html = (Path(main.STATIC) / "index.html").read_text(encoding="utf-8")
-    called = set(re.findall(r"api\('(/api/[a-z/]+)", html))
+    js = (Path(main.STATIC) / "js" / "app.js").read_text(encoding="utf-8")
+    called = set(re.findall(r"api\('(/api/[a-z/]+)", js))
     locked_prefixes = ("/api/counsellor", "/api/handoff", "/api/report", "/api/sessions", "/api/data")
     assert called and not [c for c in called if c.startswith(locked_prefixes)]
 
